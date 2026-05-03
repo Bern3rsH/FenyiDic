@@ -1,0 +1,57 @@
+Fenyidic Source Available Evaluation License
+
+Copyright (c) 2026 Bern3rsH. All rights reserved.
+
+This repository is source-available for transparency, personal evaluation, and
+private feedback. It is not open source.
+
+Permission is granted to view, fork on GitHub as permitted by GitHub's Terms of
+Service, clone, build, run, and privately modify the software for personal,
+non-commercial evaluation only.
+
+Without prior written permission from the copyright holder, you may not:
+
+1. Use the software or any derivative work for commercial purposes.
+2. Sell, rent, sublicense, publish, redistribute, or otherwise make available
+   copies of the software, modified versions, installers, binaries, or hosted
+   services based on the software.
+3. Remove or alter copyright, license, attribution, product name, or branding
+   notices.
+4. Use the project name, product name, icons, or other branding to imply
+   endorsement or to publish a competing or confusingly similar product.
+5. Bundle, upload, distribute, or provide access to third-party dictionary data,
+   MDX files, MDD files, proprietary lexical content, audio files, or other
+   content unless you have all required rights to do so.
+
+Contributions
+
+By submitting a pull request, issue comment containing code, patch, or other
+contribution to this repository, you represent that you have the right to submit
+it and grant the copyright holder a perpetual, worldwide, non-exclusive,
+royalty-free license to use, reproduce, modify, sublicense, distribute, and
+relicense that contribution as part of this project.
+
+Third-Party Components
+
+Third-party dependencies remain governed by their own licenses. This license
+does not grant rights to any third-party dictionary data, MDX/MDD files,
+lexical content, audio content, trademarks, or other materials not owned by the
+copyright holder.
+
+Termination
+
+Any permission granted by this license terminates automatically if you violate
+these terms. Upon termination, you must stop using the software and delete all
+copies under your control.
+
+No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For commercial use, redistribution, or any use outside the permissions above,
+contact the repository owner for written permission.
