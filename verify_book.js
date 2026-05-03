@@ -1,0 +1,1 @@
+const Database = require('better-sqlite3'); const path = require('path'); const db = new Database('resources/dict.db'); const rows = db.prepare("SELECT id, headword, definition_html FROM words WHERE headword = 'book' OR headword = 'Book'").all(); console.log(JSON.stringify(rows, null, 2));

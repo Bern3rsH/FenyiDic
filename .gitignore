@@ -1,0 +1,31 @@
+node_modules/
+dist/
+out/
+release/
+*.log
+.DS_Store
+
+# Local agent/runtime files
+.claude/
+.codex/
+implementation-plan.mdc
+debug_output.txt
+
+# User data
+user.db
+user.db-shm
+user.db-wal
+resources/dict.db
+resources/dict.db-shm
+resources/dict.db-wal
+
+# IDEs
+.idea/
+.vscode/
+
+# Temp files
+temp_*.html
+*.tmp
+
+# TypeScript build cache
+*.tsbuildinfo

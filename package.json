@@ -1,0 +1,94 @@
+{
+  "name": "fenyidic",
+  "version": "0.1.3",
+  "description": "A dictionary app with sense-level bookmarking and tagging",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "FENYIDIC_RUNTIME_ENV=development electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "FENYIDIC_RUNTIME_ENV=development electron-vite preview",
+    "postinstall": "electron-builder install-app-deps",
+    "pack": "npm run build && electron-builder --dir",
+    "pack:dev": "npm run build && electron-builder --dir -c.appId=com.fenyidic.dict.dev -c.productName='分义词典 Dev' -c.artifactName='fenyidic-dev-${version}-${arch}.${ext}'",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:dev": "npm run build && electron-builder --mac -c.appId=com.fenyidic.dict.dev -c.productName='分义词典 Dev' -c.artifactName='fenyidic-dev-${version}-${arch}.${ext}'",
+    "db:build": "npm rebuild better-sqlite3 && node scripts/build-db.js && npm run postinstall"
+  },
+  "build": {
+    "appId": "com.fenyidic.dict",
+    "productName": "分义词典",
+    "artifactName": "fenyidic-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.reference",
+      "target": [
+        "default"
+      ]
+    },
+    "protocols": [
+      {
+        "name": "Fenyidic",
+        "schemes": [
+          "fenyidic"
+        ]
+      }
+    ],
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://divide-meaning-dict-1254099494.cos.ap-guangzhou.myqcloud.com/updates/"
+      }
+    ]
+  },
+  "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^11.0.0",
+    "electron-store": "^6.0.1",
+    "electron-updater": "^6.7.3",
+    "jsdom": "^24.1.0",
+    "mdict-js": "^10.0.1",
+    "msedge-tts": "^2.0.4",
+    "ts-fsrs": "^5.2.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.2.0",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.1"
+  }
+}

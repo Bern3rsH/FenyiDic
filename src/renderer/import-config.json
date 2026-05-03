@@ -1,0 +1,8 @@
+{
+  "comment": "Configure CSV header mapping. 'fields' maps internal keys to possible CSV column headers (case-insensitive).",
+  "fields": {
+    "word": ["word", "单词", "headword", "term", "front"],
+    "note": ["note", "笔记", "notes"]
+  },
+  "delimiter": ","
+}

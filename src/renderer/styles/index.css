@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --app-scrollbar-size: 10px;
+  --app-scrollbar-track: transparent;
+  --app-scrollbar-thumb: rgba(148, 163, 184, 0.28);
+  --app-scrollbar-thumb-hover: rgba(100, 116, 139, 0.42);
+  --app-scrollbar-thumb-active: rgba(71, 85, 105, 0.52);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f9fafb;
+}
+
+*::-webkit-scrollbar {
+  width: var(--app-scrollbar-size);
+  height: var(--app-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--app-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: var(--app-scrollbar-thumb);
+}
+
+*:hover::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--app-scrollbar-thumb-active);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 自定义义项卡片样式 */
+.sense-card {
+  @apply bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow;
+}
+
+/* 自定义左边框宽度 */
+.border-l-3 {
+  border-left-width: 3px;
+}
+
+.sense-card .definition {
+  @apply leading-relaxed;
+}
+
+.sense-card .definition-cn {
+  @apply leading-relaxed mt-1;
+}
+
+.sense-card .examples {
+  @apply mt-3 space-y-2;
+}
+
+.sense-card .example-item {
+  @apply pl-3 border-l-2 border-blue-200;
+}
+
+.sense-card .example {
+  @apply text-gray-500 text-sm;
+}
+
+.sense-card .example-cn {
+  @apply text-gray-500 text-sm;
+}
+
+.sense-card .tags {
+  @apply flex flex-wrap gap-1 mt-3;
+}
+
+.tag-badge {
+  @apply px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* 搜索框样式 */
+.search-input {
+  @apply w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+/* 收藏按钮样式 */
+.favorite-btn {
+  @apply p-1 rounded-full hover:bg-gray-100 transition-colors;
+}
+
+.favorite-btn.active {
+  @apply text-red-500 bg-red-50;
+}
+
+/* 习语卡片样式 - 浅色背景区分 */
+.sense-card-idiom {
+  @apply bg-amber-50/60 border-amber-200/80;
+}
+
+.sense-card-idiom .example {
+  @apply border-amber-300;
+}
+
