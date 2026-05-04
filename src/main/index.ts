@@ -22,10 +22,15 @@ import type {
 autoUpdater.logger = console
 autoUpdater.autoDownload = false
 
+const UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS = 1500
+const UPDATE_INSTALL_FORCE_EXIT_DELAY_MS = 5000
+
 let manualUpdateCheckPromise: Promise<AppUpdateCheckResult> | null = null
 let manualUpdateDownloadPromise: Promise<AppUpdateDownloadResult> | null = null
 let lastAvailableUpdateInfo: AppUpdateInfo | null = null
 let lastDownloadedUpdateInfo: AppUpdateInfo | null = null
+let isInstallingDownloadedUpdate = false
+let hasStartedUpdateQuit = false
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -177,6 +182,26 @@ async function downloadManualAppUpdate(): Promise<AppUpdateDownloadResult> {
   return manualUpdateDownloadPromise
 }
 
+function scheduleUpdateInstallQuitFallback(): void {
+  setTimeout(() => {
+    if (!isInstallingDownloadedUpdate || hasStartedUpdateQuit) {
+      return
+    }
+
+    console.warn('[Update] quitAndInstall did not start app quit quickly; calling app.quit() fallback.')
+    app.quit()
+
+    setTimeout(() => {
+      if (!isInstallingDownloadedUpdate || hasStartedUpdateQuit) {
+        return
+      }
+
+      console.warn('[Update] app.quit() fallback did not start quit; forcing process exit for update install.')
+      app.exit(0)
+    }, UPDATE_INSTALL_FORCE_EXIT_DELAY_MS - UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS)
+  }, UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS)
+}
+
 function installDownloadedAppUpdate(): AppUpdateInstallResult {
   if (!app.isPackaged) {
     return {
@@ -192,8 +217,27 @@ function installDownloadedAppUpdate(): AppUpdateInstallResult {
     }
   }
 
-  autoUpdater.quitAndInstall(false, true)
-  return { success: true }
+  if (isInstallingDownloadedUpdate) {
+    return { success: true }
+  }
+
+  try {
+    isInstallingDownloadedUpdate = true
+    hasStartedUpdateQuit = false
+    console.log('[Update] Starting downloaded update install...')
+    autoUpdater.quitAndInstall(false, true)
+    scheduleUpdateInstallQuitFallback()
+    return { success: true }
+  } catch (error) {
+    isInstallingDownloadedUpdate = false
+    hasStartedUpdateQuit = false
+    const errorMessage = getErrorMessage(error)
+    console.error('[Update] Failed to start update install:', errorMessage)
+    return {
+      success: false,
+      error: errorMessage
+    }
+  }
 }
 
 function openRendererAppUpdateCheckDialog(): void {
@@ -259,6 +303,20 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.error('AutoUpdater error:', err)
+  isInstallingDownloadedUpdate = false
+  hasStartedUpdateQuit = false
+})
+
+app.on('before-quit-for-update', () => {
+  hasStartedUpdateQuit = true
+  console.log('[Update] App is quitting for update install.')
+})
+
+app.on('before-quit', () => {
+  if (isInstallingDownloadedUpdate) {
+    hasStartedUpdateQuit = true
+    console.log('[Update] App quit started during update install.')
+  }
 })
 
 // 注册协议

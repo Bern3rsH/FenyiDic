@@ -22,7 +22,7 @@ interface SettingsProps {
   readingAutoPlayAccent: 'uk' | 'us'
   setReadingAutoPlayAccent: (accent: 'uk' | 'us') => void
   appVersion: string
-  updateRequestStatus: 'idle' | 'checking' | 'downloading'
+  updateRequestStatus: 'idle' | 'checking' | 'downloading' | 'installing'
   updateProgressPercent: number | null
   onCheckForAppUpdate: () => void
 }
@@ -219,7 +219,9 @@ function Settings({
       ? '检查中...'
       : updateRequestStatus === 'downloading'
         ? formatUpdateProgressPercent(updateProgressPercent)
-        : '检查更新'
+        : updateRequestStatus === 'installing'
+          ? '正在重启...'
+          : '检查更新'
 
   return (
     <div className="w-full">
@@ -659,6 +661,12 @@ function Settings({
                       <div className="mt-2 text-xs text-gray-500">
                         正在下载更新包，进度 {formatUpdateProgressPercent(updateProgressPercent)}
                       </div>
+                    </div>
+                  )}
+
+                  {updateRequestStatus === 'installing' && (
+                    <div className="mt-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                      正在重启应用并安装更新，请稍候...
                     </div>
                   )}
                 </div>

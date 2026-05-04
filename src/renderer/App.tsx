@@ -31,7 +31,7 @@ const HEADER_HEIGHT_FALLBACK_PX = 88
 const UPDATE_PROGRESS_MIN_PERCENT = 0
 const UPDATE_PROGRESS_MAX_PERCENT = 100
 
-type UpdateRequestStatus = 'idle' | 'checking' | 'downloading'
+type UpdateRequestStatus = 'idle' | 'checking' | 'downloading' | 'installing'
 
 function clampUpdateProgressPercent(percent: number): number {
   if (!Number.isFinite(percent)) {
@@ -110,6 +110,7 @@ function App() {
     updateRequestStatusRef.current = 'checking'
     setUpdateRequestStatus('checking')
     setUpdateProgressPercent(null)
+    let shouldKeepInstallingState = false
 
     try {
       const updateCheckResult = await window.api.checkForAppUpdate()
@@ -192,6 +193,10 @@ function App() {
         return
       }
 
+      updateRequestStatusRef.current = 'installing'
+      setUpdateRequestStatus('installing')
+      setUpdateProgressPercent(null)
+
       const installResult = await window.api.installAppUpdate()
 
       if (!installResult.success) {
@@ -200,7 +205,10 @@ function App() {
           message: installResult.error || '无法启动更新安装流程。',
           type: 'danger'
         })
+        return
       }
+
+      shouldKeepInstallingState = true
     } catch (error) {
       await alert({
         title: '检查更新失败',
@@ -208,9 +216,11 @@ function App() {
         type: 'danger'
       })
     } finally {
-      updateRequestStatusRef.current = 'idle'
-      setUpdateRequestStatus('idle')
-      setUpdateProgressPercent(null)
+      if (!shouldKeepInstallingState) {
+        updateRequestStatusRef.current = 'idle'
+        setUpdateRequestStatus('idle')
+        setUpdateProgressPercent(null)
+      }
     }
   }, [alert, confirm])
 
