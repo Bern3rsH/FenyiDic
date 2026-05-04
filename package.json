@@ -1,6 +1,6 @@
 {
   "name": "fenyidic",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A dictionary app with sense-level bookmarking and tagging",
   "private": true,
   "license": "UNLICENSED",
@@ -25,11 +25,13 @@
     "directories": {
       "output": "release"
     },
+    "electronDist": "node_modules/electron/dist",
     "files": [
       "out/**/*"
     ],
     "mac": {
       "category": "public.app-category.reference",
+      "sign": "scripts/sign-mac-ad-hoc.js",
       "target": [
         "default"
       ]

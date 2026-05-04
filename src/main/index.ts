@@ -1,5 +1,5 @@
 import './runtime-environment'
-import { app, shell, BrowserWindow, screen, ipcMain, Menu } from 'electron'
+import { app, shell, BrowserWindow, screen, ipcMain, Menu, autoUpdater as nativeAutoUpdater } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -24,8 +24,9 @@ autoUpdater.autoDownload = false
 autoUpdater.fullChangelog = false
 
 const GITHUB_EMPTY_RELEASE_NOTES_TEXT = 'No content.'
-const UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS = 1500
-const UPDATE_INSTALL_FORCE_EXIT_DELAY_MS = 5000
+const MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE =
+  'macOS 自动更新要求应用使用有效签名；当前构建可能未签名，请下载新版 DMG 手动安装。'
+const UPDATE_INSTALL_START_TIMEOUT_MS = 60_000
 
 let manualUpdateCheckPromise: Promise<AppUpdateCheckResult> | null = null
 let manualUpdateDownloadPromise: Promise<AppUpdateDownloadResult> | null = null
@@ -187,27 +188,84 @@ async function downloadManualAppUpdate(): Promise<AppUpdateDownloadResult> {
   return manualUpdateDownloadPromise
 }
 
-function scheduleUpdateInstallQuitFallback(): void {
-  setTimeout(() => {
-    if (!isInstallingDownloadedUpdate || hasStartedUpdateQuit) {
-      return
+function getUpdateInstallStartTimeoutMessage(): string {
+  if (process.platform === 'darwin') {
+    return `未能启动自动安装。${MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE}`
+  }
+
+  return '未能启动自动安装，请稍后再试。'
+}
+
+function getUpdateInstallErrorMessage(error: unknown): string {
+  const errorMessage = getErrorMessage(error)
+
+  if (process.platform !== 'darwin') {
+    return errorMessage
+  }
+
+  return `${errorMessage}\n\n${MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE}`
+}
+
+function waitForUpdateInstallStart(): Promise<AppUpdateInstallResult> {
+  return new Promise((resolve) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let isSettled = false
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      nativeAutoUpdater.off('before-quit-for-update', handleBeforeQuitForUpdate)
+      app.off('before-quit', handleBeforeQuit)
+      autoUpdater.off('error', handleUpdateError)
     }
 
-    console.warn('[Update] quitAndInstall did not start app quit quickly; calling app.quit() fallback.')
-    app.quit()
-
-    setTimeout(() => {
-      if (!isInstallingDownloadedUpdate || hasStartedUpdateQuit) {
+    const finish = (result: AppUpdateInstallResult) => {
+      if (isSettled) {
         return
       }
 
-      console.warn('[Update] app.quit() fallback did not start quit; forcing process exit for update install.')
-      app.exit(0)
-    }, UPDATE_INSTALL_FORCE_EXIT_DELAY_MS - UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS)
-  }, UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS)
+      isSettled = true
+      cleanup()
+      if (!result.success) {
+        isInstallingDownloadedUpdate = false
+        hasStartedUpdateQuit = false
+      }
+      resolve(result)
+    }
+
+    const handleBeforeQuitForUpdate = () => {
+      hasStartedUpdateQuit = true
+      finish({ success: true })
+    }
+
+    const handleBeforeQuit = () => {
+      if (isInstallingDownloadedUpdate) {
+        hasStartedUpdateQuit = true
+        finish({ success: true })
+      }
+    }
+
+    const handleUpdateError = (error: Error) => {
+      finish({
+        success: false,
+        error: getUpdateInstallErrorMessage(error)
+      })
+    }
+
+    nativeAutoUpdater.once('before-quit-for-update', handleBeforeQuitForUpdate)
+    app.once('before-quit', handleBeforeQuit)
+    autoUpdater.once('error', handleUpdateError)
+    timeoutId = setTimeout(() => {
+      finish({
+        success: false,
+        error: getUpdateInstallStartTimeoutMessage()
+      })
+    }, UPDATE_INSTALL_START_TIMEOUT_MS)
+  })
 }
 
-function installDownloadedAppUpdate(): AppUpdateInstallResult {
+async function installDownloadedAppUpdate(): Promise<AppUpdateInstallResult> {
   if (!app.isPackaged) {
     return {
       success: false,
@@ -230,13 +288,13 @@ function installDownloadedAppUpdate(): AppUpdateInstallResult {
     isInstallingDownloadedUpdate = true
     hasStartedUpdateQuit = false
     console.log('[Update] Starting downloaded update install...')
+    const installStartPromise = waitForUpdateInstallStart()
     autoUpdater.quitAndInstall(false, true)
-    scheduleUpdateInstallQuitFallback()
-    return { success: true }
+    return await installStartPromise
   } catch (error) {
     isInstallingDownloadedUpdate = false
     hasStartedUpdateQuit = false
-    const errorMessage = getErrorMessage(error)
+    const errorMessage = getUpdateInstallErrorMessage(error)
     console.error('[Update] Failed to start update install:', errorMessage)
     return {
       success: false,
@@ -312,7 +370,7 @@ autoUpdater.on('error', (err) => {
   hasStartedUpdateQuit = false
 })
 
-app.on('before-quit-for-update', () => {
+nativeAutoUpdater.on('before-quit-for-update', () => {
   hasStartedUpdateQuit = true
   console.log('[Update] App is quitting for update install.')
 })
