@@ -59,6 +59,7 @@ import { ttsService } from '../services/TtsService'
 
 const CUSTOM_SEARCH_SOURCE_LABEL = '手动'
 const DICTIONARY_SEARCH_SOURCE_LABEL = '词典'
+const DIRECT_REDIRECT_PREFIX = '@@@LINK='
 const MAX_CUSTOM_HEADWORD_LENGTH = 500
 const MAX_CUSTOM_NOTE_LENGTH = 2000
 const MAX_CUSTOM_DEFINITION_CN_LENGTH = 4000
@@ -88,6 +89,26 @@ function normalizeDisplayHeadword(rawHeadword: string): string {
     .replace(/[·‧•]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function normalizeRedirectLookupHeadword(rawHeadword: string): string {
+  return decodeHtmlEntities(rawHeadword)
+    .replace(/^entry:\/\//i, '')
+    .split(/[\s<]/)[0]
+    .trim()
+}
+
+function extractDirectRedirectLookupHeadword(rawHtml: string | null | undefined): string | null {
+  const normalizedHtml = rawHtml?.trim()
+  if (!normalizedHtml?.startsWith(DIRECT_REDIRECT_PREFIX)) {
+    return null
+  }
+
+  const redirectLookupHeadword = normalizeRedirectLookupHeadword(
+    normalizedHtml.slice(DIRECT_REDIRECT_PREFIX.length)
+  )
+
+  return redirectLookupHeadword || null
 }
 
 function extractDisplayHeadwordFromHtml(rawHtml: string | null | undefined, fallbackHeadword: string): string {
@@ -160,6 +181,29 @@ function extractPlainText(rawHtmlFragment: string | null | undefined): string {
     .trim()
 }
 
+function extractNestedHtmlElementInnerHtmlByClass(
+  rawHtml: string,
+  tagName: string,
+  className: string
+): string | null {
+  const elementStartPattern = new RegExp(
+    `<${tagName}[^>]*class="[^"]*${className}[^"]*"[^>]*>`,
+    'i'
+  )
+  const elementStartMatch = elementStartPattern.exec(rawHtml)
+  if (!elementStartMatch) {
+    return null
+  }
+
+  const innerStartPosition = elementStartMatch.index + elementStartMatch[0].length
+  const elementEndPosition = findClosingHtmlTag(rawHtml, innerStartPosition, tagName)
+  if (elementEndPosition === -1) {
+    return null
+  }
+
+  return rawHtml.slice(innerStartPosition, elementEndPosition - `</${tagName}>`.length)
+}
+
 function extractLookupHeadwordFromEntryHtml(rawHtml: string, fallbackHeadword: string): string {
   const lookupHeadwordMatch = rawHtml.match(/\bwd="([^"]+)"/i)
   if (!lookupHeadwordMatch) {
@@ -198,6 +242,14 @@ function extractChineseDefinitionFromSenseHtml(rawSenseHtml: string): string {
   return extractPlainText(definitionCnMatch?.[1])
 }
 
+function extractEnglishDefinitionFromSenseHtml(rawSenseHtml: string | null | undefined): string {
+  if (!rawSenseHtml) {
+    return ''
+  }
+
+  return extractPlainText(extractNestedHtmlElementInnerHtmlByClass(rawSenseHtml, 'span', 'def'))
+}
+
 function extractSenseSignaturesFromHtml(rawHtml: string): Set<string> {
   const senseSignatures = new Set<string>()
   const senseStartPattern = /<li[^>]*class="[^"]*sense[^"]*"[^>]*>/gi
@@ -210,11 +262,7 @@ function extractSenseSignaturesFromHtml(rawHtml: string): Set<string> {
     }
 
     const senseHtml = rawHtml.slice(senseStartMatch.index, senseEndPosition)
-    const definitionMatch = senseHtml.match(
-      /<span[^>]*class="[^"]*def[^"]*"[^>]*>([\s\S]*?)<\/span>/i
-    )
-
-    const definition = extractPlainText(definitionMatch?.[1])
+    const definition = extractEnglishDefinitionFromSenseHtml(senseHtml)
     if (!definition) {
       continue
     }
@@ -735,6 +783,41 @@ export function registerIpcHandlers(): void {
       definition_html: string
       dict_name: string
     }>
+    const redirectTargetStmt = db.prepare(`
+      SELECT
+        id,
+        headword AS lookup_headword,
+        definition_html,
+        '${DICTIONARY_SEARCH_SOURCE_LABEL}' AS dict_name
+      FROM words
+      WHERE headword = ?
+      LIMIT 1
+    `)
+
+    const resolveDictionarySearchResult = (result: {
+      id: number
+      lookup_headword: string
+      definition_html: string
+      dict_name: string
+    }) => {
+      const redirectLookupHeadword = extractDirectRedirectLookupHeadword(result.definition_html)
+      if (!redirectLookupHeadword || redirectLookupHeadword === result.lookup_headword) {
+        return { resolvedResult: result, redirectLookupHeadword: null }
+      }
+
+      const resolvedResult = (
+        redirectTargetStmt.get(redirectLookupHeadword) as
+          | {
+              id: number
+              lookup_headword: string
+              definition_html: string
+              dict_name: string
+            }
+          | undefined
+      ) || result
+
+      return { resolvedResult, redirectLookupHeadword }
+    }
 
     const flattenedSearchResults = searchResults.flatMap((result) => {
       if (result.id < 0) {
@@ -748,14 +831,17 @@ export function registerIpcHandlers(): void {
         ]
       }
 
-      return extractDictionaryEntryVariants(result.definition_html, result.lookup_headword)
-        .filter((variant) => variantMatchesQueryPrefix(variant, normalizedQuery))
+      const { resolvedResult, redirectLookupHeadword } = resolveDictionarySearchResult(result)
+      const variantMatchQuery = redirectLookupHeadword || normalizedQuery
+
+      return extractDictionaryEntryVariants(resolvedResult.definition_html, resolvedResult.lookup_headword)
+        .filter((variant) => variantMatchesQueryPrefix(variant, variantMatchQuery))
         .map((variant) => ({
-          id: result.id,
+          id: resolvedResult.id,
           headword: variant.displayHeadword,
-          lookupHeadword: getPreferredVariantLookupHeadword(variant, normalizedQuery),
-          dict_name: result.dict_name,
-          ...getVariantSearchRank(variant, normalizedQuery)
+          lookupHeadword: getPreferredVariantLookupHeadword(variant, variantMatchQuery),
+          dict_name: resolvedResult.dict_name,
+          ...getVariantSearchRank(variant, variantMatchQuery)
         }))
     })
 
@@ -778,7 +864,16 @@ export function registerIpcHandlers(): void {
       return left.id - right.id
     })
 
-    return flattenedSearchResults
+    const uniqueSearchResultMap = new Map<string, (typeof flattenedSearchResults)[number]>()
+    for (const result of flattenedSearchResults) {
+      const resultKey = `${result.id}:${result.headword}:${result.lookupHeadword || ''}:${result.dict_name}`
+      if (!uniqueSearchResultMap.has(resultKey)) {
+        uniqueSearchResultMap.set(resultKey, result)
+      }
+    }
+    const uniqueSearchResults = Array.from(uniqueSearchResultMap.values())
+
+    return uniqueSearchResults
       .slice(0, limit)
       .map(({ exactMatchRank: _exactMatchRank, matchLengthRank: _matchLengthRank, displayHeadwordRank: _displayHeadwordRank, ...result }) => result)
   })
@@ -889,7 +984,12 @@ export function registerIpcHandlers(): void {
         JOIN user_db.sense_tags st ON t.id = st.tag_id
         WHERE st.sense_id = ?
       `).all(sense.id)
-      return { ...sense, tags }
+      const repairedDefinition = extractEnglishDefinitionFromSenseHtml(sense.raw_html)
+      return {
+        ...sense,
+        definition: repairedDefinition || sense.definition,
+        tags
+      }
     })
 
     let filteredSensesWithTags = sensesWithTags

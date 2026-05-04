@@ -3,7 +3,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { initFsrsTables } from '../services/fsrs-service'
-import { SYSTEM_TAGS } from '../../shared/types'
+import { DEFAULT_REVIEW_TAGS, SYSTEM_TAGS } from '../../shared/types'
 
 let db: Database.Database | null = null
 const LEGACY_ARCHIVED_TAG_NAME = '已归档'
@@ -112,6 +112,20 @@ function migrateArchivedTagName(tablePrefix: 'user_db.' | ''): void {
   })
 
   mergeLegacyArchivedTag()
+}
+
+function seedDefaultTags(tablePrefix: 'user_db.' | ''): void {
+  if (!db) return
+
+  const tagsTable = `${tablePrefix}tags`
+  const insertTag = db.prepare(`INSERT OR IGNORE INTO ${tagsTable} (name, color) VALUES (?, ?)`)
+
+  insertTag.run(SYSTEM_TAGS.FAVORITE.name, SYSTEM_TAGS.FAVORITE.color)
+  insertTag.run(SYSTEM_TAGS.ARCHIVED.name, SYSTEM_TAGS.ARCHIVED.color)
+
+  for (const tag of DEFAULT_REVIEW_TAGS) {
+    insertTag.run(tag.name, tag.color)
+  }
 }
 
 export function getDatabase(): Database.Database {
@@ -255,15 +269,7 @@ function initUserDatabaseOnly(userDbPath: string): void {
 
   initCustomEntryTables('')
 
-  // Create system tags
-  db.prepare(`INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)`).run(
-    SYSTEM_TAGS.FAVORITE.name,
-    SYSTEM_TAGS.FAVORITE.color
-  )
-  db.prepare(`INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)`).run(
-    SYSTEM_TAGS.ARCHIVED.name,
-    SYSTEM_TAGS.ARCHIVED.color
-  )
+  seedDefaultTags('')
   migrateArchivedTagName('')
 }
 
@@ -328,15 +334,7 @@ function initUserTables(): void {
     console.error('Failed to add created_at column:', e)
   }
 
-  // Create system tags
-  db.prepare(`INSERT OR IGNORE INTO user_db.tags (name, color) VALUES (?, ?)`).run(
-    SYSTEM_TAGS.FAVORITE.name,
-    SYSTEM_TAGS.FAVORITE.color
-  )
-  db.prepare(`INSERT OR IGNORE INTO user_db.tags (name, color) VALUES (?, ?)`).run(
-    SYSTEM_TAGS.ARCHIVED.name,
-    SYSTEM_TAGS.ARCHIVED.color
-  )
+  seedDefaultTags('user_db.')
   migrateArchivedTagName('user_db.')
 }
 

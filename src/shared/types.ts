@@ -156,6 +156,13 @@ export const DEFAULT_TAG_MODE_CONFIGS: TagModeConfig[] = [
   { tagName: '听写错', mode: 'dictation' }
 ]
 
+export const DEFAULT_REVIEW_TAG_COLOR = '#3B82F6'
+
+export const DEFAULT_REVIEW_TAGS = DEFAULT_TAG_MODE_CONFIGS.map(({ tagName }) => ({
+  name: tagName,
+  color: DEFAULT_REVIEW_TAG_COLOR
+}))
+
 export interface UserDictionaryConfig {
   id: string
   name: string

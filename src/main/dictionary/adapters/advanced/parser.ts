@@ -101,12 +101,7 @@ export class AdvancedParser extends BaseDictionaryParser {
       const index = sensenumMatch ? parseInt(sensenumMatch[1], 10) : autoIndex++
 
       // Extract definition
-      const defMatch = content.match(
-        /<span[^>]*class="[^"]*def[^"]*"[^>]*>([\s\S]*?)<\/span>/i
-      )
-      const definition = defMatch
-        ? defMatch[1].replace(/<[^>]+>/g, '').trim()
-        : ''
+      const definition = this.extractDefinition(content)
 
       // Extract Chinese definition
       const definitionCn = this.extractChineseDefinition(content)
@@ -222,6 +217,27 @@ export class AdvancedParser extends BaseDictionaryParser {
       }
     }
     return ''
+  }
+
+  private extractDefinition(content: string): string {
+    const definitionStartRegex = /<span[^>]*class="[^"]*def[^"]*"[^>]*>/i
+    const definitionStartMatch = definitionStartRegex.exec(content)
+    if (!definitionStartMatch) {
+      return ''
+    }
+
+    const definitionStartPosition = definitionStartMatch.index + definitionStartMatch[0].length
+    const definitionEndPosition = this.findClosingTag(content, definitionStartPosition, 'span')
+    if (definitionEndPosition === -1) {
+      return ''
+    }
+
+    const definitionHtml = content.substring(
+      definitionStartPosition,
+      definitionEndPosition - '</span>'.length
+    )
+
+    return this.extractTextContent(definitionHtml)
   }
 
   private extractGrammar(content: string): string {

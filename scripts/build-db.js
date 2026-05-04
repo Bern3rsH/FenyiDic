@@ -144,6 +144,23 @@ function parseOALDSensesSimple(html) {
     return -1;
   }
 
+  function extractDefinition(content) {
+    const defStartRegex = /<span[^>]*class="[^"]*def[^"]*"[^>]*>/i;
+    const defStartMatch = defStartRegex.exec(content);
+    if (!defStartMatch) {
+      return '';
+    }
+
+    const defStartPosition = defStartMatch.index + defStartMatch[0].length;
+    const defEndPosition = findClosingTag(content, defStartPosition, 'span');
+    if (defEndPosition === -1) {
+      return '';
+    }
+
+    const defHtml = content.substring(defStartPosition, defEndPosition - '</span>'.length);
+    return defHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   // 1. 找到所有 <li class="sense"> 的开始位置
   const senseStartRegex = /<li[^>]*class="[^"]*sense[^"]*"[^>]*>/gi;
   let match;
@@ -174,8 +191,7 @@ function parseOALDSensesSimple(html) {
     let index = sensenumMatch ? parseInt(sensenumMatch[1], 10) : autoIndex++;
 
     // 提取定义
-    const defMatch = content.match(/<span[^>]*class="[^"]*def[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
-    const definition = defMatch ? defMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+    const definition = extractDefinition(content);
 
     // 提取中文定义（从 deft 标签）
     const definitionCn = extractChineseDefinition(content);
