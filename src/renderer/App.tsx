@@ -30,6 +30,7 @@ const SEARCH_PAGE_MIN_TOP_PADDING_PX = 24
 const HEADER_HEIGHT_FALLBACK_PX = 88
 const UPDATE_PROGRESS_MIN_PERCENT = 0
 const UPDATE_PROGRESS_MAX_PERCENT = 100
+const EMPTY_RELEASE_NOTES_MESSAGE = '本次发布未填写更新内容。'
 
 type UpdateRequestStatus = 'idle' | 'checking' | 'downloading' | 'installing'
 
@@ -51,6 +52,11 @@ function getErrorMessage(error: unknown): string {
   }
 
   return '未知错误'
+}
+
+function formatReleaseNotesForDialog(releaseNotes: string | null | undefined): string {
+  const trimmedReleaseNotes = releaseNotes?.trim()
+  return trimmedReleaseNotes || EMPTY_RELEASE_NOTES_MESSAGE
 }
 
 function App() {
@@ -142,12 +148,12 @@ function App() {
         return
       }
 
-      const releaseNotes = updateCheckResult.updateInfo.releaseNotes?.trim()
+      const releaseNotes = formatReleaseNotesForDialog(updateCheckResult.updateInfo.releaseNotes)
       const updateMessage = [
         `当前版本：${updateCheckResult.currentVersion}`,
         `最新版本：${updateCheckResult.updateInfo.version}`,
         updateCheckResult.updateInfo.releaseName ? `版本名称：${updateCheckResult.updateInfo.releaseName}` : null,
-        releaseNotes ? `更新说明：\n${releaseNotes}` : null,
+        `本次更新内容：\n${releaseNotes}`,
         '是否现在下载更新？'
       ]
         .filter(Boolean)

@@ -21,7 +21,9 @@ import type {
 // 配置自动更新日志
 autoUpdater.logger = console
 autoUpdater.autoDownload = false
+autoUpdater.fullChangelog = false
 
+const GITHUB_EMPTY_RELEASE_NOTES_TEXT = 'No content.'
 const UPDATE_INSTALL_QUIT_FALLBACK_DELAY_MS = 1500
 const UPDATE_INSTALL_FORCE_EXIT_DELAY_MS = 5000
 
@@ -46,13 +48,16 @@ function getErrorMessage(error: unknown): string {
 
 function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string | null {
   if (typeof releaseNotes === 'string') {
-    return releaseNotes
+    const trimmedReleaseNotes = releaseNotes.trim()
+    return trimmedReleaseNotes && trimmedReleaseNotes !== GITHUB_EMPTY_RELEASE_NOTES_TEXT ? trimmedReleaseNotes : null
   }
 
   if (Array.isArray(releaseNotes)) {
     const normalizedNotes = releaseNotes
       .map(({ version, note }) => [version, note].filter(Boolean).join('\n'))
+      .map((note) => note.trim())
       .filter((note) => note.length > 0)
+      .filter((note) => note !== GITHUB_EMPTY_RELEASE_NOTES_TEXT)
 
     return normalizedNotes.length > 0 ? normalizedNotes.join('\n\n') : null
   }

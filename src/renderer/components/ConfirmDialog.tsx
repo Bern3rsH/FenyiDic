@@ -79,7 +79,7 @@ export function ConfirmDialog({
     >
       <div 
         ref={dialogRef}
-        className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+        className="flex max-h-[78vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-2xl mx-4"
         style={{ animation: 'scaleIn 0.2s ease-out' }}
       >
         {/* 标题 */}
@@ -89,7 +89,7 @@ export function ConfirmDialog({
         </div>
         
         {/* 内容 */}
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto">
           <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{message}</p>
         </div>
         

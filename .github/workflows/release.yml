@@ -27,8 +27,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare local release notes
+        run: node scripts/extract-release-notes.js --output "$RUNNER_TEMP/release-notes.md"
+
       - name: Publish macOS artifacts to GitHub Releases
         run: npm run release:mac
         env:
           GH_TOKEN: ${{ github.token }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Apply local release notes
+        run: |
+          RELEASE_TAG="v$(node -p "require('./package.json').version")"
+          gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+        env:
+          GH_TOKEN: ${{ github.token }}
