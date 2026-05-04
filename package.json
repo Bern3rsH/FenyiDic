@@ -1,6 +1,6 @@
 {
   "name": "fenyidic",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A dictionary app with sense-level bookmarking and tagging",
   "private": true,
   "license": "UNLICENSED",
