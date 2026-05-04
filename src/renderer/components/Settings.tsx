@@ -22,8 +22,7 @@ interface SettingsProps {
   readingAutoPlayAccent: 'uk' | 'us'
   setReadingAutoPlayAccent: (accent: 'uk' | 'us') => void
   appVersion: string
-  updateRequestStatus: 'idle' | 'checking' | 'downloading' | 'installing'
-  updateProgressPercent: number | null
+  updateRequestStatus: 'idle' | 'checking'
   onCheckForAppUpdate: () => void
 }
 
@@ -35,27 +34,8 @@ const sectionDefinitions: Array<{
   { id: 'search', title: '查词设置', subtitle: '配置查词行为与释义显示' },
   { id: 'review', title: '复习设置', subtitle: '配置复习模式、发音与标签策略' },
   { id: 'reading', title: '阅读设置', subtitle: '配置辅助精读法阅读相关选项' },
-  { id: 'software', title: '软件更新', subtitle: '检查版本并安装更新' }
+  { id: 'software', title: '软件更新', subtitle: '检查版本并前往下载页面' }
 ]
-
-const UPDATE_PROGRESS_MIN_PERCENT = 0
-const UPDATE_PROGRESS_MAX_PERCENT = 100
-
-function clampUpdateProgressPercent(percent: number): number {
-  if (!Number.isFinite(percent)) {
-    return UPDATE_PROGRESS_MIN_PERCENT
-  }
-
-  return Math.min(UPDATE_PROGRESS_MAX_PERCENT, Math.max(UPDATE_PROGRESS_MIN_PERCENT, percent))
-}
-
-function formatUpdateProgressPercent(percent: number | null): string {
-  if (percent === null) {
-    return '下载中...'
-  }
-
-  return `${Math.round(clampUpdateProgressPercent(percent))}%`
-}
 
 const tagReviewModeOptions: Array<{ value: ReviewMode; label: string }> = [
   { value: 'read', label: '阅读理解' },
@@ -84,7 +64,6 @@ function Settings({
   setReadingAutoPlayAccent,
   appVersion,
   updateRequestStatus,
-  updateProgressPercent,
   onCheckForAppUpdate
 }: SettingsProps) {
   const [activeSection, setActiveSection] = useState<SettingSection>('search')
@@ -214,14 +193,7 @@ function Settings({
   }
 
   const isUpdateActionRunning = updateRequestStatus !== 'idle'
-  const updateButtonText =
-    updateRequestStatus === 'checking'
-      ? '检查中...'
-      : updateRequestStatus === 'downloading'
-        ? formatUpdateProgressPercent(updateProgressPercent)
-        : updateRequestStatus === 'installing'
-          ? '正在重启...'
-          : '检查更新'
+  const updateButtonText = updateRequestStatus === 'checking' ? '检查中...' : '检查更新'
 
   return (
     <div className="w-full">
@@ -632,7 +604,7 @@ function Settings({
                     <div>
                       <div className="font-medium text-gray-900">检查软件更新</div>
                       <div className="mt-1 text-sm text-gray-500">
-                        当前版本 {appVersion || '读取中'}。点击后会检查发布源，有新版本时再由你确认下载和重启安装。
+                        当前版本 {appVersion || '读取中'}。点击后会检查发布源，有新版本时可前往 GitHub Releases 下载新版安装包。
                       </div>
                     </div>
 
@@ -649,26 +621,6 @@ function Settings({
                       {updateButtonText}
                     </button>
                   </div>
-
-                  {updateRequestStatus === 'downloading' && (
-                    <div className="mt-4">
-                      <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-                        <div
-                          className="h-full rounded-full bg-blue-600 transition-all"
-                          style={{ width: `${clampUpdateProgressPercent(updateProgressPercent ?? 0)}%` }}
-                        />
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        正在下载更新包，进度 {formatUpdateProgressPercent(updateProgressPercent)}
-                      </div>
-                    </div>
-                  )}
-
-                  {updateRequestStatus === 'installing' && (
-                    <div className="mt-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                      正在重启应用并安装更新，请稍候...
-                    </div>
-                  )}
                 </div>
               </div>
             )}

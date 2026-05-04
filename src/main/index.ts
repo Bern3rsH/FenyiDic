@@ -1,5 +1,5 @@
 import './runtime-environment'
-import { app, shell, BrowserWindow, screen, ipcMain, Menu, autoUpdater as nativeAutoUpdater } from 'electron'
+import { app, shell, BrowserWindow, screen, ipcMain, Menu } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,14 +8,12 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { initMdd } from './services/mdd-service'
 
 import { autoUpdater } from 'electron-updater'
-import type { ProgressInfo, UpdateInfo } from 'electron-updater'
+import type { UpdateInfo } from 'electron-updater'
 import { IPC_CHANNELS } from '../shared/types'
+import { normalizeReleaseNotes } from './updateReleaseNotes'
 import type {
   AppUpdateCheckResult,
-  AppUpdateDownloadResult,
   AppUpdateInfo,
-  AppUpdateInstallResult,
-  AppUpdateProgress
 } from '../shared/types'
 
 // 配置自动更新日志
@@ -23,17 +21,9 @@ autoUpdater.logger = console
 autoUpdater.autoDownload = false
 autoUpdater.fullChangelog = false
 
-const GITHUB_EMPTY_RELEASE_NOTES_TEXT = 'No content.'
-const MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE =
-  'macOS 自动更新要求应用使用有效签名；当前构建可能未签名，请下载新版 DMG 手动安装。'
-const UPDATE_INSTALL_START_TIMEOUT_MS = 60_000
+const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/fenyidic/releases/latest'
 
 let manualUpdateCheckPromise: Promise<AppUpdateCheckResult> | null = null
-let manualUpdateDownloadPromise: Promise<AppUpdateDownloadResult> | null = null
-let lastAvailableUpdateInfo: AppUpdateInfo | null = null
-let lastDownloadedUpdateInfo: AppUpdateInfo | null = null
-let isInstallingDownloadedUpdate = false
-let hasStartedUpdateQuit = false
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -47,25 +37,6 @@ function getErrorMessage(error: unknown): string {
   return '未知错误'
 }
 
-function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string | null {
-  if (typeof releaseNotes === 'string') {
-    const trimmedReleaseNotes = releaseNotes.trim()
-    return trimmedReleaseNotes && trimmedReleaseNotes !== GITHUB_EMPTY_RELEASE_NOTES_TEXT ? trimmedReleaseNotes : null
-  }
-
-  if (Array.isArray(releaseNotes)) {
-    const normalizedNotes = releaseNotes
-      .map(({ version, note }) => [version, note].filter(Boolean).join('\n'))
-      .map((note) => note.trim())
-      .filter((note) => note.length > 0)
-      .filter((note) => note !== GITHUB_EMPTY_RELEASE_NOTES_TEXT)
-
-    return normalizedNotes.length > 0 ? normalizedNotes.join('\n\n') : null
-  }
-
-  return null
-}
-
 function normalizeUpdateInfo(info: UpdateInfo): AppUpdateInfo {
   return {
     version: info.version,
@@ -73,24 +44,6 @@ function normalizeUpdateInfo(info: UpdateInfo): AppUpdateInfo {
     releaseNotes: normalizeReleaseNotes(info.releaseNotes),
     releaseDate: info.releaseDate ?? null
   }
-}
-
-function normalizeUpdateProgress(progressInfo: ProgressInfo): AppUpdateProgress {
-  return {
-    percent: Number.isFinite(progressInfo.percent) ? progressInfo.percent : 0,
-    transferred: Number.isFinite(progressInfo.transferred) ? progressInfo.transferred : 0,
-    total: Number.isFinite(progressInfo.total) ? progressInfo.total : 0,
-    bytesPerSecond: Number.isFinite(progressInfo.bytesPerSecond) ? progressInfo.bytesPerSecond : 0
-  }
-}
-
-function sendToMainWindow(channel: string, payload: unknown): void {
-  const mainWindow = getMainWindow()
-  if (!mainWindow || mainWindow.webContents.isDestroyed()) {
-    return
-  }
-
-  mainWindow.webContents.send(channel, payload)
 }
 
 async function checkForManualAppUpdate(): Promise<AppUpdateCheckResult> {
@@ -115,8 +68,6 @@ async function checkForManualAppUpdate(): Promise<AppUpdateCheckResult> {
 
       if (!updateCheckResult || !updateCheckResult.isUpdateAvailable) {
         const updateInfo = updateCheckResult?.updateInfo
-        lastAvailableUpdateInfo = null
-        lastDownloadedUpdateInfo = null
         return {
           status: 'not-available',
           currentVersion,
@@ -125,8 +76,6 @@ async function checkForManualAppUpdate(): Promise<AppUpdateCheckResult> {
       }
 
       const updateInfo = normalizeUpdateInfo(updateCheckResult.updateInfo)
-      lastAvailableUpdateInfo = updateInfo
-      lastDownloadedUpdateInfo = null
 
       return {
         status: 'available',
@@ -149,153 +98,13 @@ async function checkForManualAppUpdate(): Promise<AppUpdateCheckResult> {
   return manualUpdateCheckPromise
 }
 
-async function downloadManualAppUpdate(): Promise<AppUpdateDownloadResult> {
-  if (!app.isPackaged) {
-    return {
-      success: false,
-      error: '开发环境不支持下载安装更新，请打包安装后再测试。'
-    }
-  }
-
-  if (manualUpdateDownloadPromise) {
-    return manualUpdateDownloadPromise
-  }
-
-  manualUpdateDownloadPromise = (async () => {
-    try {
-      console.log('[Update] Downloading update by user action...')
-      await autoUpdater.downloadUpdate()
-      if (!lastDownloadedUpdateInfo && lastAvailableUpdateInfo) {
-        lastDownloadedUpdateInfo = lastAvailableUpdateInfo
-      }
-
-      return {
-        success: true,
-        updateInfo: lastDownloadedUpdateInfo ?? lastAvailableUpdateInfo ?? undefined
-      }
-    } catch (error) {
-      const errorMessage = getErrorMessage(error)
-      console.error('[Update] Failed to download update:', errorMessage)
-      return {
-        success: false,
-        error: errorMessage
-      }
-    } finally {
-      manualUpdateDownloadPromise = null
-    }
-  })()
-
-  return manualUpdateDownloadPromise
-}
-
-function getUpdateInstallStartTimeoutMessage(): string {
-  if (process.platform === 'darwin') {
-    return `未能启动自动安装。${MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE}`
-  }
-
-  return '未能启动自动安装，请稍后再试。'
-}
-
-function getUpdateInstallErrorMessage(error: unknown): string {
-  const errorMessage = getErrorMessage(error)
-
-  if (process.platform !== 'darwin') {
-    return errorMessage
-  }
-
-  return `${errorMessage}\n\n${MACOS_AUTO_UPDATE_SIGNING_REQUIREMENT_MESSAGE}`
-}
-
-function waitForUpdateInstallStart(): Promise<AppUpdateInstallResult> {
-  return new Promise((resolve) => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-    let isSettled = false
-
-    const cleanup = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
-      nativeAutoUpdater.off('before-quit-for-update', handleBeforeQuitForUpdate)
-      app.off('before-quit', handleBeforeQuit)
-      autoUpdater.off('error', handleUpdateError)
-    }
-
-    const finish = (result: AppUpdateInstallResult) => {
-      if (isSettled) {
-        return
-      }
-
-      isSettled = true
-      cleanup()
-      if (!result.success) {
-        isInstallingDownloadedUpdate = false
-        hasStartedUpdateQuit = false
-      }
-      resolve(result)
-    }
-
-    const handleBeforeQuitForUpdate = () => {
-      hasStartedUpdateQuit = true
-      finish({ success: true })
-    }
-
-    const handleBeforeQuit = () => {
-      if (isInstallingDownloadedUpdate) {
-        hasStartedUpdateQuit = true
-        finish({ success: true })
-      }
-    }
-
-    const handleUpdateError = (error: Error) => {
-      finish({
-        success: false,
-        error: getUpdateInstallErrorMessage(error)
-      })
-    }
-
-    nativeAutoUpdater.once('before-quit-for-update', handleBeforeQuitForUpdate)
-    app.once('before-quit', handleBeforeQuit)
-    autoUpdater.once('error', handleUpdateError)
-    timeoutId = setTimeout(() => {
-      finish({
-        success: false,
-        error: getUpdateInstallStartTimeoutMessage()
-      })
-    }, UPDATE_INSTALL_START_TIMEOUT_MS)
-  })
-}
-
-async function installDownloadedAppUpdate(): Promise<AppUpdateInstallResult> {
-  if (!app.isPackaged) {
-    return {
-      success: false,
-      error: '开发环境不支持安装更新。'
-    }
-  }
-
-  if (!lastDownloadedUpdateInfo) {
-    return {
-      success: false,
-      error: '更新包尚未下载完成。'
-    }
-  }
-
-  if (isInstallingDownloadedUpdate) {
-    return { success: true }
-  }
-
+async function openLatestReleasePage(): Promise<{ success: boolean; error?: string }> {
   try {
-    isInstallingDownloadedUpdate = true
-    hasStartedUpdateQuit = false
-    console.log('[Update] Starting downloaded update install...')
-    const installStartPromise = waitForUpdateInstallStart()
-    autoUpdater.quitAndInstall(false, true)
-    return await installStartPromise
+    await shell.openExternal(LATEST_RELEASE_PAGE_URL)
+    return { success: true }
   } catch (error) {
-    isInstallingDownloadedUpdate = false
-    hasStartedUpdateQuit = false
-    const errorMessage = getUpdateInstallErrorMessage(error)
-    console.error('[Update] Failed to start update install:', errorMessage)
+    const errorMessage = getErrorMessage(error)
+    console.error('[Update] Failed to open latest release page:', errorMessage)
     return {
       success: false,
       error: errorMessage
@@ -351,35 +160,8 @@ function configureApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(applicationMenuTemplate))
 }
 
-autoUpdater.on('update-available', (info) => {
-  lastAvailableUpdateInfo = normalizeUpdateInfo(info)
-  lastDownloadedUpdateInfo = null
-})
-
-autoUpdater.on('download-progress', (progressInfo) => {
-  sendToMainWindow(IPC_CHANNELS.APP_UPDATE_DOWNLOAD_PROGRESS, normalizeUpdateProgress(progressInfo))
-})
-
-autoUpdater.on('update-downloaded', (info) => {
-  lastDownloadedUpdateInfo = normalizeUpdateInfo(info)
-})
-
 autoUpdater.on('error', (err) => {
   console.error('AutoUpdater error:', err)
-  isInstallingDownloadedUpdate = false
-  hasStartedUpdateQuit = false
-})
-
-nativeAutoUpdater.on('before-quit-for-update', () => {
-  hasStartedUpdateQuit = true
-  console.log('[Update] App is quitting for update install.')
-})
-
-app.on('before-quit', () => {
-  if (isInstallingDownloadedUpdate) {
-    hasStartedUpdateQuit = true
-    console.log('[Update] App quit started during update install.')
-  }
 })
 
 // 注册协议
@@ -682,8 +464,7 @@ if (!gotTheLock) {
 
     ipcMain.handle(IPC_CHANNELS.GET_APP_VERSION, () => app.getVersion())
     ipcMain.handle(IPC_CHANNELS.CHECK_APP_UPDATE, () => checkForManualAppUpdate())
-    ipcMain.handle(IPC_CHANNELS.DOWNLOAD_APP_UPDATE, () => downloadManualAppUpdate())
-    ipcMain.handle(IPC_CHANNELS.INSTALL_APP_UPDATE, () => installDownloadedAppUpdate())
+    ipcMain.handle(IPC_CHANNELS.OPEN_LATEST_RELEASE_PAGE, () => openLatestReleasePage())
 
     console.log('Creating window...')
     createWindow()

@@ -4,7 +4,7 @@ import WordEntry from './components/WordEntry'
 import FavoriteList from './components/FavoriteList'
 import Settings from './components/Settings'
 import DictionarySetup from './components/DictionarySetup'
-import type { AppUpdateProgress, TagModeConfig } from '../shared/types'
+import type { TagModeConfig } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
 import { getDefaultTagModeConfigs, normalizeTagModeConfigs } from './utils/tagModeConfigs'
 
@@ -28,19 +28,9 @@ export type DisplayMode = 'en' | 'cn' | 'both'
 const SEARCH_PAGE_INPUT_TOP_RATIO = 0.38
 const SEARCH_PAGE_MIN_TOP_PADDING_PX = 24
 const HEADER_HEIGHT_FALLBACK_PX = 88
-const UPDATE_PROGRESS_MIN_PERCENT = 0
-const UPDATE_PROGRESS_MAX_PERCENT = 100
 const EMPTY_RELEASE_NOTES_MESSAGE = '本次发布未填写更新内容。'
 
-type UpdateRequestStatus = 'idle' | 'checking' | 'downloading' | 'installing'
-
-function clampUpdateProgressPercent(percent: number): number {
-  if (!Number.isFinite(percent)) {
-    return UPDATE_PROGRESS_MIN_PERCENT
-  }
-
-  return Math.min(UPDATE_PROGRESS_MAX_PERCENT, Math.max(UPDATE_PROGRESS_MIN_PERCENT, percent))
-}
+type UpdateRequestStatus = 'idle' | 'checking'
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -88,7 +78,6 @@ function App() {
   // 软件更新
   const [appVersion, setAppVersion] = useState('')
   const [updateRequestStatus, setUpdateRequestStatus] = useState<UpdateRequestStatus>('idle')
-  const [updateProgressPercent, setUpdateProgressPercent] = useState<number | null>(null)
   const { confirm, alert, DialogComponent } = useConfirmDialog()
   
   // URL Schema 预填充查询词
@@ -115,8 +104,6 @@ function App() {
 
     updateRequestStatusRef.current = 'checking'
     setUpdateRequestStatus('checking')
-    setUpdateProgressPercent(null)
-    let shouldKeepInstallingState = false
 
     try {
       const updateCheckResult = await window.api.checkForAppUpdate()
@@ -154,67 +141,31 @@ function App() {
         `最新版本：${updateCheckResult.updateInfo.version}`,
         updateCheckResult.updateInfo.releaseName ? `版本名称：${updateCheckResult.updateInfo.releaseName}` : null,
         `本次更新内容：\n${releaseNotes}`,
-        '是否现在下载更新？'
+        '是否前往 GitHub Releases 下载新版安装包？'
       ]
         .filter(Boolean)
         .join('\n\n')
 
-      const shouldDownloadUpdate = await confirm({
+      const shouldOpenReleasePage = await confirm({
         title: '发现新版本',
         message: updateMessage,
-        confirmText: '下载更新',
+        confirmText: '前往下载',
         cancelText: '稍后',
         type: 'info'
       })
 
-      if (!shouldDownloadUpdate) {
+      if (!shouldOpenReleasePage) {
         return
       }
 
-      updateRequestStatusRef.current = 'downloading'
-      setUpdateRequestStatus('downloading')
-      setUpdateProgressPercent(UPDATE_PROGRESS_MIN_PERCENT)
-
-      const downloadResult = await window.api.downloadAppUpdate()
-
-      if (!downloadResult.success) {
+      const openReleasePageResult = await window.api.openLatestReleasePage()
+      if (!openReleasePageResult.success) {
         await alert({
-          title: '下载更新失败',
-          message: downloadResult.error || '更新包下载失败，请稍后再试。',
+          title: '打开下载页面失败',
+          message: openReleasePageResult.error || '无法打开 GitHub Releases 页面，请稍后再试。',
           type: 'danger'
         })
-        return
       }
-
-      const downloadedVersion = downloadResult.updateInfo?.version || updateCheckResult.updateInfo.version
-      const shouldInstallUpdate = await confirm({
-        title: '更新已下载',
-        message: `新版本 ${downloadedVersion} 已下载完成，需要重启应用后完成安装。是否现在重启安装？`,
-        confirmText: '重启安装',
-        cancelText: '稍后',
-        type: 'success'
-      })
-
-      if (!shouldInstallUpdate) {
-        return
-      }
-
-      updateRequestStatusRef.current = 'installing'
-      setUpdateRequestStatus('installing')
-      setUpdateProgressPercent(null)
-
-      const installResult = await window.api.installAppUpdate()
-
-      if (!installResult.success) {
-        await alert({
-          title: '安装更新失败',
-          message: installResult.error || '无法启动更新安装流程。',
-          type: 'danger'
-        })
-        return
-      }
-
-      shouldKeepInstallingState = true
     } catch (error) {
       await alert({
         title: '检查更新失败',
@@ -222,11 +173,8 @@ function App() {
         type: 'danger'
       })
     } finally {
-      if (!shouldKeepInstallingState) {
-        updateRequestStatusRef.current = 'idle'
-        setUpdateRequestStatus('idle')
-        setUpdateProgressPercent(null)
-      }
+      updateRequestStatusRef.current = 'idle'
+      setUpdateRequestStatus('idle')
     }
   }, [alert, confirm])
 
@@ -269,16 +217,12 @@ function App() {
         console.error('Failed to load app version', error)
       })
 
-    const removeUpdateProgressListener = window.api.onAppUpdateDownloadProgress((progress: AppUpdateProgress) => {
-      setUpdateProgressPercent(clampUpdateProgressPercent(progress.percent))
-    })
     const removeOpenUpdateDialogListener = window.api.onOpenAppUpdateCheckDialog(() => {
       void handleCheckForAppUpdate()
     })
 
     return () => {
       isEffectActive = false
-      removeUpdateProgressListener()
       removeOpenUpdateDialogListener()
     }
   }, [handleCheckForAppUpdate])
@@ -658,7 +602,6 @@ function App() {
               setReadingAutoPlayAccent={setReadingAutoPlayAccent}
               appVersion={appVersion}
               updateRequestStatus={updateRequestStatus}
-              updateProgressPercent={updateProgressPercent}
               onCheckForAppUpdate={handleCheckForAppUpdate}
             />
           </div>

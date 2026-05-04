@@ -257,13 +257,6 @@ export interface AppUpdateInfo {
   releaseDate?: string | null
 }
 
-export interface AppUpdateProgress {
-  percent: number
-  transferred: number
-  total: number
-  bytesPerSecond: number
-}
-
 export type AppUpdateCheckResult =
   | {
       status: 'available'
@@ -285,17 +278,6 @@ export type AppUpdateCheckResult =
       currentVersion: string
       error: string
     }
-
-export interface AppUpdateDownloadResult {
-  success: boolean
-  updateInfo?: AppUpdateInfo
-  error?: string
-}
-
-export interface AppUpdateInstallResult {
-  success: boolean
-  error?: string
-}
 
 // IPC 通道
 export const IPC_CHANNELS = {
@@ -355,9 +337,7 @@ export const IPC_CHANNELS = {
   // 软件更新
   GET_APP_VERSION: 'app:getVersion',
   CHECK_APP_UPDATE: 'appUpdate:check',
-  DOWNLOAD_APP_UPDATE: 'appUpdate:download',
-  INSTALL_APP_UPDATE: 'appUpdate:install',
-  APP_UPDATE_DOWNLOAD_PROGRESS: 'appUpdate:downloadProgress',
+  OPEN_LATEST_RELEASE_PAGE: 'appUpdate:openLatestReleasePage',
   APP_UPDATE_OPEN_CHECK_DIALOG: 'appUpdate:openCheckDialog',
 
   // 词典管理

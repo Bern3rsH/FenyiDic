@@ -20,10 +20,7 @@ import {
   DeleteCustomEntryResult,
   DeleteCustomWordPayload,
   DeleteCustomWordResult,
-  AppUpdateCheckResult,
-  AppUpdateDownloadResult,
-  AppUpdateInstallResult,
-  AppUpdateProgress
+  AppUpdateCheckResult
 } from '../shared/types'
 
 export type IpcApi = {
@@ -83,9 +80,7 @@ export type IpcApi = {
   // 软件更新
   getAppVersion: () => Promise<string>
   checkForAppUpdate: () => Promise<AppUpdateCheckResult>
-  downloadAppUpdate: () => Promise<AppUpdateDownloadResult>
-  installAppUpdate: () => Promise<AppUpdateInstallResult>
-  onAppUpdateDownloadProgress: (callback: (progress: AppUpdateProgress) => void) => () => void
+  openLatestReleasePage: () => Promise<{ success: boolean; error?: string }>
   onOpenAppUpdateCheckDialog: (callback: () => void) => () => void
 
   // 词典管理
@@ -171,13 +166,7 @@ const api: IpcApi = {
   // 软件更新
   getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_VERSION),
   checkForAppUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_APP_UPDATE),
-  downloadAppUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_APP_UPDATE),
-  installAppUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.INSTALL_APP_UPDATE),
-  onAppUpdateDownloadProgress: (callback) => {
-    const listener = (_event: any, progress: AppUpdateProgress) => callback(progress)
-    ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_DOWNLOAD_PROGRESS, listener)
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_UPDATE_DOWNLOAD_PROGRESS, listener)
-  },
+  openLatestReleasePage: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_LATEST_RELEASE_PAGE),
   onOpenAppUpdateCheckDialog: (callback) => {
     const listener = () => callback()
     ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG, listener)
