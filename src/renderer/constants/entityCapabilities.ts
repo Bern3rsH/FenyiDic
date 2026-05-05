@@ -17,8 +17,8 @@ export const entityCapabilities: Record<EntityType, EntityCapabilityConfig> = {
     canReview: true
   },
   word: {
-    canFavorite: false,
-    canNote: false,
+    canFavorite: true,
+    canNote: true,
     canTag: true,
     canArchive: true,
     canReview: true

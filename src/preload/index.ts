@@ -20,7 +20,9 @@ import {
   DeleteCustomEntryResult,
   DeleteCustomWordPayload,
   DeleteCustomWordResult,
-  AppUpdateCheckResult
+  AppUpdateCheckResult,
+  TelemetryEventName,
+  TelemetryEventProperties
 } from '../shared/types'
 
 export type IpcApi = {
@@ -54,6 +56,12 @@ export type IpcApi = {
   getSenseTags: (senseId: number) => Promise<any[]>
   addEntityTag: (entityType: EntityType, entityId: number, tagId: number) => Promise<{ success: boolean }>
   removeEntityTag: (entityType: EntityType, entityId: number, tagId: number) => Promise<{ success: boolean }>
+  updateEntityTagsBatch: (
+    entityType: EntityType,
+    entityIds: number[],
+    tagIds: number[],
+    operation: 'add' | 'remove'
+  ) => Promise<{ success: boolean; error?: string }>
   /** @deprecated Prefer addEntityTag('sense', senseId, tagId). */
   addSenseTag: (senseId: number, tagId: number) => Promise<{ success: boolean }>
   /** @deprecated Prefer removeEntityTag('sense', senseId, tagId). */
@@ -69,6 +77,10 @@ export type IpcApi = {
   saveNote: (senseId: number, note: string) => Promise<{ success: boolean }>
   getNote: (senseId: number) => Promise<{ success: boolean; note: string | null }>
   deleteNote: (senseId: number) => Promise<{ success: boolean }>
+  deleteEntityNotesBatch: (
+    entityType: EntityType,
+    entityIds: number[]
+  ) => Promise<{ success: boolean; error?: string }>
   saveWordNote: (wordId: number, note: string) => Promise<{ success: boolean }>
   getWordNote: (wordId: number) => Promise<{ success: boolean; note: string | null }>
   deleteWordNote: (wordId: number) => Promise<{ success: boolean }>
@@ -82,6 +94,12 @@ export type IpcApi = {
   checkForAppUpdate: () => Promise<AppUpdateCheckResult>
   openLatestReleasePage: () => Promise<{ success: boolean; error?: string }>
   onOpenAppUpdateCheckDialog: (callback: () => void) => () => void
+
+  // 匿名统计
+  captureTelemetryEvent: (
+    eventName: TelemetryEventName,
+    properties?: TelemetryEventProperties
+  ) => void
 
   // 词典管理
   checkDictionary: () => Promise<DictionaryStatus>
@@ -144,6 +162,8 @@ const api: IpcApi = {
   getSenseTags: (senseId) => ipcRenderer.invoke(IPC_CHANNELS.GET_SENSE_TAGS, senseId),
   addEntityTag: (entityType, entityId, tagId) => addEntityTagInternal(entityType, entityId, tagId),
   removeEntityTag: (entityType, entityId, tagId) => removeEntityTagInternal(entityType, entityId, tagId),
+  updateEntityTagsBatch: (entityType, entityIds, tagIds, operation) =>
+    ipcRenderer.invoke(IPC_CHANNELS.UPDATE_ENTITY_TAGS_BATCH, entityType, entityIds, tagIds, operation),
   addSenseTag: (senseId, tagId) => addEntityTagInternal('sense', senseId, tagId),
   removeSenseTag: (senseId, tagId) => removeEntityTagInternal('sense', senseId, tagId),
   addWordTag: (wordId, tagId) => addEntityTagInternal('word', wordId, tagId),
@@ -155,6 +175,8 @@ const api: IpcApi = {
   saveNote: (senseId, note) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_NOTE, senseId, note),
   getNote: (senseId) => ipcRenderer.invoke(IPC_CHANNELS.GET_NOTE, senseId),
   deleteNote: (senseId) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_NOTE, senseId),
+  deleteEntityNotesBatch: (entityType, entityIds) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_ENTITY_NOTES_BATCH, entityType, entityIds),
   saveWordNote: (wordId, note) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_WORD_NOTE, wordId, note),
   getWordNote: (wordId) => ipcRenderer.invoke(IPC_CHANNELS.GET_WORD_NOTE, wordId),
   deleteWordNote: (wordId) => ipcRenderer.invoke(IPC_CHANNELS.DELETE_WORD_NOTE, wordId),
@@ -172,6 +194,10 @@ const api: IpcApi = {
     ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG, listener)
   },
+
+  // 匿名统计
+  captureTelemetryEvent: (eventName, properties) =>
+    ipcRenderer.send(IPC_CHANNELS.CAPTURE_TELEMETRY_EVENT, eventName, properties),
 
   // 词典管理
   checkDictionary: () => ipcRenderer.invoke(IPC_CHANNELS.DICTIONARY_CHECK),

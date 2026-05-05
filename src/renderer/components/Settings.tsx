@@ -3,10 +3,11 @@ import { SYSTEM_TAGS } from '../../shared/types'
 import type { ReviewMode, TagModeConfig } from '../../shared/types'
 
 type SettingSection = 'search' | 'review' | 'reading' | 'software'
+type DefinitionDisplayMode = 'en' | 'cn' | 'both'
 
 interface SettingsProps {
-  displayMode: 'en' | 'cn' | 'both'
-  setDisplayMode: (mode: 'en' | 'cn' | 'both') => void
+  displayMode: DefinitionDisplayMode
+  setDisplayMode: (mode: DefinitionDisplayMode) => void
   reviewAutoPlay: boolean
   setReviewAutoPlay: (value: boolean) => void
   reviewAutoPlayAccent: 'uk' | 'us'
@@ -17,6 +18,8 @@ interface SettingsProps {
   setSearchAutoPlay: (value: boolean) => void
   searchAutoPlayAccent: 'uk' | 'us'
   setSearchAutoPlayAccent: (accent: 'uk' | 'us') => void
+  readingDisplayMode: DefinitionDisplayMode
+  setReadingDisplayMode: (mode: DefinitionDisplayMode) => void
   readingAutoPlay: boolean
   setReadingAutoPlay: (value: boolean) => void
   readingAutoPlayAccent: 'uk' | 'us'
@@ -45,6 +48,12 @@ const tagReviewModeOptions: Array<{ value: ReviewMode; label: string }> = [
   { value: 'dictation', label: '听写检测' }
 ]
 
+const definitionDisplayModeOptions: Array<{ value: DefinitionDisplayMode; label: string }> = [
+  { value: 'en', label: '英文' },
+  { value: 'cn', label: '中文' },
+  { value: 'both', label: '双语' }
+]
+
 function Settings({
   displayMode,
   setDisplayMode,
@@ -58,6 +67,8 @@ function Settings({
   setSearchAutoPlay,
   searchAutoPlayAccent,
   setSearchAutoPlayAccent,
+  readingDisplayMode,
+  setReadingDisplayMode,
   readingAutoPlay,
   setReadingAutoPlay,
   readingAutoPlayAccent,
@@ -237,36 +248,19 @@ function Settings({
                     </div>
 
                     <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
-                      <button
-                        onClick={() => setDisplayMode('en')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                          displayMode === 'en'
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        英文
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('cn')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                          displayMode === 'cn'
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        中文
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('both')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                          displayMode === 'both'
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        双语
-                      </button>
+                      {definitionDisplayModeOptions.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          onClick={() => setDisplayMode(value)}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                            displayMode === value
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-900'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -543,6 +537,31 @@ function Settings({
 
             {activeSection === 'reading' && (
               <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <div className="font-medium text-gray-900">释义语言模式</div>
+                      <div className="text-sm text-gray-500 mt-1">选择阅读查词和选义列表显示的语言组合</div>
+                    </div>
+
+                    <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
+                      {definitionDisplayModeOptions.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          onClick={() => setReadingDisplayMode(value)}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                            readingDisplayMode === value
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-900'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium text-gray-900">点击查词时自动发音</div>

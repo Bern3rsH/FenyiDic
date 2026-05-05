@@ -39,6 +39,27 @@ export interface Tag {
   color: string
 }
 
+export const TELEMETRY_EVENT_NAMES = [
+  'app_opened',
+  'window_opened',
+  'view_changed',
+  'feature_used',
+  'dictionary_import_started',
+  'dictionary_import_finished',
+  'app_update_checked'
+] as const
+
+export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
+
+export type TelemetryEventProperties = Record<string, string | number | boolean | null | undefined>
+
+export function isTelemetryEventName(value: unknown): value is TelemetryEventName {
+  return (
+    typeof value === 'string' &&
+    (TELEMETRY_EVENT_NAMES as readonly string[]).includes(value)
+  )
+}
+
 export type EntityType = 'sense' | 'word'
 
 export function isEntityType(value: unknown): value is EntityType {
@@ -305,6 +326,7 @@ export const IPC_CHANNELS = {
   GET_SENSE_TAGS: 'senseTag:get',
   ADD_ENTITY_TAG: 'entityTag:add',
   REMOVE_ENTITY_TAG: 'entityTag:remove',
+  UPDATE_ENTITY_TAGS_BATCH: 'entityTag:updateBatch',
   ADD_SENSE_TAG: 'senseTag:add',
   REMOVE_SENSE_TAG: 'senseTag:remove',
   ADD_WORD_TAG: 'wordTag:add',
@@ -326,6 +348,7 @@ export const IPC_CHANNELS = {
   SAVE_NOTE: 'note:save',
   GET_NOTE: 'note:get',
   DELETE_NOTE: 'note:delete',
+  DELETE_ENTITY_NOTES_BATCH: 'entityNote:deleteBatch',
   SAVE_WORD_NOTE: 'wordNote:save',
   GET_WORD_NOTE: 'wordNote:get',
   DELETE_WORD_NOTE: 'wordNote:delete',
@@ -339,6 +362,9 @@ export const IPC_CHANNELS = {
   CHECK_APP_UPDATE: 'appUpdate:check',
   OPEN_LATEST_RELEASE_PAGE: 'appUpdate:openLatestReleasePage',
   APP_UPDATE_OPEN_CHECK_DIALOG: 'appUpdate:openCheckDialog',
+
+  // 匿名统计
+  CAPTURE_TELEMETRY_EVENT: 'telemetry:captureEvent',
 
   // 词典管理
   DICTIONARY_CHECK: 'dictionary:check',

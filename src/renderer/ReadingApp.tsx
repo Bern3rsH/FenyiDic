@@ -14,6 +14,7 @@ declare global {
 
 type ReadingStage = 'input' | 'markWords' | 'reading' | 'shuffleCn' | 'wordStudy' | 'batch'
 type ReadingFlowStepId = 'input' | 'markWords' | 'lookup' | 'shuffleCn' | 'wordStudy' | 'batch'
+type DefinitionDisplayMode = 'en' | 'cn' | 'both'
 type ReadingFlowStepMeta = {
   label: string
 }
@@ -404,6 +405,18 @@ function getShuffleCnDefinition(entry: SelectedReadingSenseEntry): string {
   }
 
   return '该义项暂无中文释义'
+}
+
+function isDefinitionDisplayMode(value: unknown): value is DefinitionDisplayMode {
+  return value === 'en' || value === 'cn' || value === 'both'
+}
+
+function shouldShowEnglishDefinition(displayMode: DefinitionDisplayMode): boolean {
+  return displayMode === 'en' || displayMode === 'both'
+}
+
+function shouldShowChineseDefinition(displayMode: DefinitionDisplayMode): boolean {
+  return displayMode === 'cn' || displayMode === 'both'
 }
 
 function getVisibleReadingTags(tags: Tag[]): Tag[] {
@@ -1387,6 +1400,7 @@ export default function ReadingApp() {
   const [readingStage, setReadingStage] = useState<ReadingStage>('input')
   const [draftText, setDraftText] = useState('')
   const [committedText, setCommittedText] = useState('')
+  const [readingDisplayMode, setReadingDisplayMode] = useState<DefinitionDisplayMode>('both')
   const [readingAutoPlay, setReadingAutoPlay] = useState(false)
   const [readingAutoPlayAccent, setReadingAutoPlayAccent] = useState<'uk' | 'us'>('uk')
   const [readingSessionId, setReadingSessionId] = useState<string | null>(null)
@@ -1461,15 +1475,20 @@ export default function ReadingApp() {
 
   useEffect(() => {
     let isEffectActive = true
-    const loadReadingPronunciationSettings = async () => {
+    const loadReadingSettings = async () => {
       try {
-        const [storedReadingAutoPlay, storedReadingAutoPlayAccent] = await Promise.all([
+        const [storedReadingDisplayMode, storedReadingAutoPlay, storedReadingAutoPlayAccent] = await Promise.all([
+          window.api.getSetting<DefinitionDisplayMode>('readingDisplayMode'),
           window.api.getSetting<boolean>('readingAutoPlay'),
           window.api.getSetting<'uk' | 'us'>('readingAutoPlayAccent')
         ])
 
         if (!isEffectActive) {
           return
+        }
+
+        if (isDefinitionDisplayMode(storedReadingDisplayMode)) {
+          setReadingDisplayMode(storedReadingDisplayMode)
         }
 
         if (storedReadingAutoPlay !== null && storedReadingAutoPlay !== undefined) {
@@ -1480,16 +1499,16 @@ export default function ReadingApp() {
           setReadingAutoPlayAccent(storedReadingAutoPlayAccent)
         }
       } catch (error) {
-        console.error('Failed to load reading pronunciation settings:', error)
+        console.error('Failed to load reading settings:', error)
       }
     }
 
-    void loadReadingPronunciationSettings()
-    window.addEventListener('focus', loadReadingPronunciationSettings)
+    void loadReadingSettings()
+    window.addEventListener('focus', loadReadingSettings)
 
     return () => {
       isEffectActive = false
-      window.removeEventListener('focus', loadReadingPronunciationSettings)
+      window.removeEventListener('focus', loadReadingSettings)
     }
   }, [])
 
@@ -2506,14 +2525,14 @@ export default function ReadingApp() {
                           <div className="text-base font-semibold text-slate-900">
                             {selectedEntry?.headword || entry.sourceLabel}
                           </div>
-                          {selectedEntry?.definitionCn ? (
+                          {selectedEntry && shouldShowChineseDefinition(readingDisplayMode) && selectedEntry.definitionCn ? (
                             <div className="mt-2 text-sm leading-6 text-slate-700">
                               {selectedEntry.definitionCn}
                             </div>
-                          ) : (
+                          ) : !selectedEntry ? (
                             <div className="mt-2 text-sm leading-6 text-slate-400">尚未选择语境义项</div>
-                          )}
-                          {selectedEntry && (
+                          ) : null}
+                          {selectedEntry && shouldShowEnglishDefinition(readingDisplayMode) && (
                             <div className="mt-1 text-sm leading-6 text-slate-500">
                               {selectedEntry.definition}
                             </div>
@@ -2711,7 +2730,7 @@ export default function ReadingApp() {
                               onFavoriteToggle={() =>
                                 void handleLookupSenseFavoriteToggle(sense.id, sense.is_favorited === 1)
                               }
-                              displayMode="both"
+                              displayMode={readingDisplayMode}
                               size="compact"
                             />
 
@@ -3108,10 +3127,12 @@ export default function ReadingApp() {
                             <div className="mt-2 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                               {entry.sourceLabel} · {getReadingEntryPositionLabel(entry)}
                             </div>
-                            {entry.definitionCn && (
+                            {shouldShowChineseDefinition(readingDisplayMode) && entry.definitionCn && (
                               <div className="mt-2 text-sm leading-6 text-slate-700">{entry.definitionCn}</div>
                             )}
-                            <div className="mt-1 text-sm leading-6 text-slate-500">{entry.definition}</div>
+                            {shouldShowEnglishDefinition(readingDisplayMode) && (
+                              <div className="mt-1 text-sm leading-6 text-slate-500">{entry.definition}</div>
+                            )}
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">

@@ -11,6 +11,7 @@ import { autoUpdater } from 'electron-updater'
 import type { UpdateInfo } from 'electron-updater'
 import { IPC_CHANNELS } from '../shared/types'
 import { normalizeReleaseNotes } from './updateReleaseNotes'
+import { captureTelemetryEvent, initializeTelemetry } from './telemetry'
 import type {
   AppUpdateCheckResult,
   AppUpdateInfo,
@@ -22,6 +23,8 @@ autoUpdater.autoDownload = false
 autoUpdater.fullChangelog = false
 
 const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/fenyidic/releases/latest'
+
+initializeTelemetry()
 
 let manualUpdateCheckPromise: Promise<AppUpdateCheckResult> | null = null
 
@@ -128,6 +131,15 @@ function openRendererAppUpdateCheckDialog(): void {
   mainWindow.webContents.send(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG)
 }
 
+function closeFocusedWindow(): void {
+  const focusedWindow = BrowserWindow.getFocusedWindow()
+  if (!focusedWindow || focusedWindow.isDestroyed()) {
+    return
+  }
+
+  focusedWindow.close()
+}
+
 function configureApplicationMenu(): void {
   if (process.platform !== 'darwin') {
     return
@@ -154,7 +166,21 @@ function configureApplicationMenu(): void {
     },
     { role: 'editMenu' },
     { role: 'viewMenu' },
-    { role: 'windowMenu' }
+    {
+      label: '窗口',
+      submenu: [
+        {
+          label: '关闭窗口',
+          accelerator: 'Command+W',
+          click: closeFocusedWindow
+        },
+        { type: 'separator' },
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        { role: 'front' }
+      ]
+    }
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(applicationMenuTemplate))
@@ -298,6 +324,8 @@ function createReviewWindow(anchorWindow?: BrowserWindow): void {
     reviewWindow = null
   })
 
+  captureTelemetryEvent('window_opened', { window: 'review' })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     reviewWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/review.html`)
   } else {
@@ -356,6 +384,8 @@ function createReadingWindow(anchorWindow?: BrowserWindow): void {
     readingWindow = null
   })
 
+  captureTelemetryEvent('window_opened', { window: 'reading' })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     readingWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/reading.html`)
   } else {
@@ -389,6 +419,8 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  captureTelemetryEvent('window_opened', { window: 'main' })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -468,6 +500,7 @@ if (!gotTheLock) {
 
     console.log('Creating window...')
     createWindow()
+    captureTelemetryEvent('app_opened')
     console.log('Window created.')
   } catch (error) {
     console.error('Failed to initialize app:', error)

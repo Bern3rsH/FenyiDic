@@ -7,6 +7,7 @@ import DictionarySetup from './components/DictionarySetup'
 import type { TagModeConfig } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
 import { getDefaultTagModeConfigs, normalizeTagModeConfigs } from './utils/tagModeConfigs'
+import { captureTelemetryEvent } from './telemetry'
 
 declare global {
   interface Window {
@@ -72,6 +73,7 @@ function App() {
   const [searchAutoPlayAccent, setSearchAutoPlayAccent] = useState<'uk' | 'us'>('uk')
   
   // 阅读设置
+  const [readingDisplayMode, setReadingDisplayMode] = useState<DisplayMode>('both')
   const [readingAutoPlay, setReadingAutoPlay] = useState(false)
   const [readingAutoPlayAccent, setReadingAutoPlayAccent] = useState<'uk' | 'us'>('uk')
 
@@ -94,6 +96,10 @@ function App() {
   useEffect(() => {
     window.api.checkDictionary().then((status) => {
       setHasDictionary(status.hasActiveDictionary)
+      captureTelemetryEvent('feature_used', {
+        feature: 'dictionary_check',
+        has_dictionary: status.hasActiveDictionary
+      })
     })
   }, [])
 
@@ -107,6 +113,10 @@ function App() {
 
     try {
       const updateCheckResult = await window.api.checkForAppUpdate()
+      captureTelemetryEvent('app_update_checked', {
+        status: updateCheckResult.status,
+        update_available: updateCheckResult.status === 'available'
+      })
 
       if (updateCheckResult.status === 'unsupported') {
         await alert({
@@ -159,6 +169,10 @@ function App() {
       }
 
       const openReleasePageResult = await window.api.openLatestReleasePage()
+      captureTelemetryEvent('feature_used', {
+        feature: 'open_latest_release_page',
+        success: openReleasePageResult.success
+      })
       if (!openReleasePageResult.success) {
         await alert({
           title: '打开下载页面失败',
@@ -226,6 +240,13 @@ function App() {
       removeOpenUpdateDialogListener()
     }
   }, [handleCheckForAppUpdate])
+
+  useEffect(() => {
+    captureTelemetryEvent('view_changed', {
+      view,
+      has_selected_word: Boolean(selectedWordId)
+    })
+  }, [selectedWordId, view])
   
   // 从 electron-store 加载设置
   useEffect(() => {
@@ -237,6 +258,7 @@ function App() {
       window.api.getSetting<unknown>('tagModes'),
       window.api.getSetting<boolean>('searchAutoPlay'),
       window.api.getSetting<'uk' | 'us'>('searchAutoPlayAccent'),
+      window.api.getSetting<DisplayMode>('readingDisplayMode'),
       window.api.getSetting<boolean>('readingAutoPlay'),
       window.api.getSetting<'uk' | 'us'>('readingAutoPlayAccent')
     ]).then(
@@ -248,6 +270,7 @@ function App() {
         tagModeSetting,
         searchAP,
         searchAPAccent,
+        readingMode,
         readingAP,
         readingAPAccent
       ]) => {
@@ -257,6 +280,7 @@ function App() {
         if (debugNoFsrs !== null && debugNoFsrs !== undefined) setReviewDebugNoFsrs(debugNoFsrs)
         if (searchAP !== null && searchAP !== undefined) setSearchAutoPlay(searchAP)
         if (searchAPAccent) setSearchAutoPlayAccent(searchAPAccent)
+        if (readingMode) setReadingDisplayMode(readingMode)
         if (readingAP !== null && readingAP !== undefined) setReadingAutoPlay(readingAP)
         if (readingAPAccent) setReadingAutoPlayAccent(readingAPAccent)
         const normalizedTagModeConfigs = normalizeTagModeConfigs(tagModeSetting)
@@ -278,6 +302,7 @@ function App() {
       window.api.setSetting('tagModes', normalizeTagModeConfigs(tagModeConfigs))
       window.api.setSetting('searchAutoPlay', searchAutoPlay)
       window.api.setSetting('searchAutoPlayAccent', searchAutoPlayAccent)
+      window.api.setSetting('readingDisplayMode', readingDisplayMode)
       window.api.setSetting('readingAutoPlay', readingAutoPlay)
       window.api.setSetting('readingAutoPlayAccent', readingAutoPlayAccent)
     }
@@ -289,6 +314,7 @@ function App() {
     tagModeConfigs,
     searchAutoPlay,
     searchAutoPlayAccent,
+    readingDisplayMode,
     readingAutoPlay,
     readingAutoPlayAccent,
     displayModeLoaded
@@ -313,6 +339,10 @@ function App() {
   }, [history, historyIndex])
 
   const handleWordSelect = (wordId: number, entryHeadword?: string) => {
+    captureTelemetryEvent('feature_used', {
+      feature: 'search_result_selected',
+      has_entry_headword: Boolean(entryHeadword)
+    })
     setSelectedWordId(wordId)
     setSelectedEntryHeadword(entryHeadword ?? null)
     pushHistory(view, wordId, entryHeadword ?? null)
@@ -378,6 +408,9 @@ function App() {
   }
 
   const handleViewChange = (newView: View) => {
+    captureTelemetryEvent('feature_used', {
+      feature: `open_${newView}_view`
+    })
     // 如果切换到"我的"页面，或者在"我的"页面点击按钮，都触发刷新
     if (newView === 'favorites') {
       setFavoritesRefreshKey(k => k + 1)
@@ -523,11 +556,23 @@ function App() {
               我的
             </button>
 
-            <button onClick={() => window.api.openReviewWindow()} className={getTopNavButtonClass(false)}>
+            <button
+              onClick={() => {
+                captureTelemetryEvent('feature_used', { feature: 'open_review_window' })
+                void window.api.openReviewWindow()
+              }}
+              className={getTopNavButtonClass(false)}
+            >
               复习
             </button>
 
-            <button onClick={() => window.api.openReadingWindow()} className={getTopNavButtonClass(false)}>
+            <button
+              onClick={() => {
+                captureTelemetryEvent('feature_used', { feature: 'open_reading_window' })
+                void window.api.openReadingWindow()
+              }}
+              className={getTopNavButtonClass(false)}
+            >
               阅读
             </button>
 
@@ -596,6 +641,8 @@ function App() {
               setSearchAutoPlay={setSearchAutoPlay}
               searchAutoPlayAccent={searchAutoPlayAccent}
               setSearchAutoPlayAccent={setSearchAutoPlayAccent}
+              readingDisplayMode={readingDisplayMode}
+              setReadingDisplayMode={setReadingDisplayMode}
               readingAutoPlay={readingAutoPlay}
               setReadingAutoPlay={setReadingAutoPlay}
               readingAutoPlayAccent={readingAutoPlayAccent}

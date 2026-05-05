@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, type MouseEvent } from 'react'
 import SenseCard from './SenseCard'
 import Sidebar from './Sidebar'
 import TagSelector from './TagSelector'
 import ArchiveIcon from './ArchiveIcon'
 import { useConfirmDialog } from './ConfirmDialog'
 import TagManagerDialog from './TagManagerDialog'
+import BatchTagDialog, { type BatchTagDialogMode } from './BatchTagDialog'
 import { SYSTEM_TAGS } from '../../shared/types'
-import type { EntityType, FavoriteListItem, FavoriteSenseItem, FavoriteWordItem } from '../../shared/types'
+import type { EntityType, FavoriteListItem, FavoriteSenseItem, FavoriteWordItem, Tag } from '../../shared/types'
 import { entityCapabilities } from '../constants/entityCapabilities'
 
 function isIdiomGroup(senseGroup?: string): boolean {
@@ -251,11 +252,16 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
   )
   const [showTagManager, setShowTagManager] = useState(false)
   const [wordTagSelectorState, setWordTagSelectorState] = useState<WordTagSelectorState | null>(null)
+  const [batchTagDialogMode, setBatchTagDialogMode] = useState<BatchTagDialogMode | null>(null)
   const { confirm, alert, DialogComponent } = useConfirmDialog()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeCapabilities = entityCapabilities[activeTab]
-  const canUseSelectionMode = activeCapabilities.canFavorite || activeCapabilities.canNote
+  const canUseSelectionMode =
+    activeCapabilities.canFavorite ||
+    activeCapabilities.canNote ||
+    activeCapabilities.canTag ||
+    activeCapabilities.canArchive
   const filters = filterStateByTab[activeTab]
 
   const triggerImport = () => {
@@ -268,6 +274,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     }
     setIsSelectionMode(false)
     setSelectedEntityIds(new Set())
+    setBatchTagDialogMode(null)
   }, [canUseSelectionMode])
 
   const hasActiveFilters =
@@ -411,6 +418,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     setSelectedEntityIds(new Set())
     setEditingWordNoteId(null)
     setWordNoteDraft('')
+    setBatchTagDialogMode(null)
   }
 
   const switchActiveTab = (nextTab: EntityType) => {
@@ -423,6 +431,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     setEditingWordNoteId(null)
     setWordNoteDraft('')
     setWordTagSelectorState(null)
+    setBatchTagDialogMode(null)
   }
 
   const toggleSelection = (entityId: number) => {
@@ -435,6 +444,16 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     setSelectedEntityIds(nextSelectedEntityIds)
   }
 
+  const handleSelectionCardClickCapture = (event: MouseEvent<HTMLDivElement>, entityId: number) => {
+    if (!isSelectionMode || !canUseSelectionMode) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    toggleSelection(entityId)
+  }
+
   const handleSelectAll = () => {
     if (selectedEntityIds.size === visibleFavorites.length) {
       setSelectedEntityIds(new Set())
@@ -443,26 +462,96 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     setSelectedEntityIds(new Set(visibleFavorites.map((favoriteItem) => getFavoriteItemEntityId(favoriteItem))))
   }
 
-  const handleBatchDelete = async () => {
+  const resetBatchSelection = (options: { keepTagDialogOpen?: boolean } = {}) => {
+    setSelectedEntityIds(new Set())
+    setIsSelectionMode(false)
+    if (!options.keepTagDialogOpen) {
+      setBatchTagDialogMode(null)
+    }
+  }
+
+  const updateSelectedEntityTags = async (
+    tagIds: number[],
+    operation: 'add' | 'remove',
+    options: { keepTagDialogOpen?: boolean } = {}
+  ) => {
+    const entityIds = Array.from(selectedEntityIds)
+    if (entityIds.length === 0) {
+      throw new Error('Missing selected entities for batch tag update')
+    }
+
+    const result = await window.api.updateEntityTagsBatch(activeTab, entityIds, tagIds, operation)
+    if (!result.success) {
+      throw new Error(result.error || 'Batch tag update failed')
+    }
+
+    resetBatchSelection({ keepTagDialogOpen: options.keepTagDialogOpen })
+    await loadFavorites(true)
+  }
+
+  const handleBatchTagConfirm = async (selectedTags: Tag[]) => {
+    if (!batchTagDialogMode) {
+      throw new Error('Missing batch tag mode')
+    }
+
+    await updateSelectedEntityTags(
+      selectedTags.map((tag) => tag.id),
+      batchTagDialogMode,
+      { keepTagDialogOpen: true }
+    )
+  }
+
+  const handleBatchFavoriteUpdate = async (operation: 'add' | 'remove') => {
     if (!activeCapabilities.canFavorite || selectedEntityIds.size === 0) return
+    if (!favoriteTagId) {
+      await alert({ title: '操作失败', message: '收藏标签不存在，请重启应用后重试', type: 'danger' })
+      return
+    }
+
+    const isAdding = operation === 'add'
     const confirmed = await confirm({
-      title: '取消收藏',
-      message: `确定要取消收藏选中的 ${selectedEntityIds.size} 个义项吗？`,
-      type: 'danger',
-      confirmText: '取消收藏'
+      title: isAdding ? '批量收藏' : '取消收藏',
+      message: `确定要${isAdding ? '收藏' : '取消收藏'}选中的 ${selectedEntityIds.size} 项吗？`,
+      type: isAdding ? 'info' : 'danger',
+      confirmText: isAdding ? '收藏' : '取消收藏'
     })
     if (!confirmed) return
 
     setLoading(true)
     try {
-      await window.api.removeFavoritesBatch(Array.from(selectedEntityIds))
-      await loadFavorites()
-      setIsSelectionMode(false)
-      setSelectedEntityIds(new Set())
+      await updateSelectedEntityTags([favoriteTagId], operation)
     } catch (error) {
-      console.error('Batch delete failed:', error)
+      console.error('Batch favorite update failed:', error)
       await alert({ title: '操作失败', message: '请重试', type: 'danger' })
-      await loadFavorites()
+      await loadFavorites(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBatchArchiveUpdate = async (operation: 'add' | 'remove') => {
+    if (!activeCapabilities.canArchive || selectedEntityIds.size === 0) return
+    if (!archivedTagId) {
+      await alert({ title: '操作失败', message: '归档标签不存在，请重启应用后重试', type: 'danger' })
+      return
+    }
+
+    const isAdding = operation === 'add'
+    const confirmed = await confirm({
+      title: isAdding ? '批量归档' : '取消归档',
+      message: `确定要${isAdding ? '归档' : '取消归档'}选中的 ${selectedEntityIds.size} 项吗？`,
+      type: isAdding ? 'warning' : 'info',
+      confirmText: isAdding ? '归档' : '取消归档'
+    })
+    if (!confirmed) return
+
+    setLoading(true)
+    try {
+      await updateSelectedEntityTags([archivedTagId], operation)
+    } catch (error) {
+      console.error('Batch archive update failed:', error)
+      await alert({ title: '操作失败', message: '请重试', type: 'danger' })
+      await loadFavorites(true)
     } finally {
       setLoading(false)
     }
@@ -807,22 +896,27 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     if (!activeCapabilities.canNote || selectedEntityIds.size === 0) return
 
     const confirmed = await confirm({
-      title: '清空笔记',
-      message: `确定要清空选中的 ${selectedEntityIds.size} 个词条的笔记吗？`,
+      title: '删除笔记',
+      message: `确定要删除选中的 ${selectedEntityIds.size} 项的笔记吗？`,
       type: 'warning',
-      confirmText: '清空'
+      confirmText: '删除笔记'
     })
     if (!confirmed) return
 
+    setLoading(true)
     try {
-      const senseIds = Array.from(selectedEntityIds)
-      await Promise.all(senseIds.map((senseId) => window.api.deleteNote(senseId)))
-      setSelectedEntityIds(new Set())
-      setIsSelectionMode(false)
-      await loadFavorites()
+      const result = await window.api.deleteEntityNotesBatch(activeTab, Array.from(selectedEntityIds))
+      if (!result.success) {
+        throw new Error(result.error || 'Batch delete notes failed')
+      }
+      resetBatchSelection()
+      await loadFavorites(true)
     } catch (error) {
-      console.error(error)
+      console.error('Batch clear notes failed:', error)
       await alert({ title: '操作出错', message: '请重试', type: 'danger' })
+      await loadFavorites(true)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -854,32 +948,73 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {isSelectionMode && canUseSelectionMode && (
           <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <div className="text-sm text-gray-500">已选择 {selectedEntityIds.size} 项</div>
-            <div className="flex gap-2">
-                <button
-                  onClick={handleSelectAll}
-                  className="text-xs px-2.5 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  {selectedEntityIds.size === visibleFavorites.length && visibleFavorites.length > 0
-                    ? '取消'
-                    : '全选'}
-                </button>
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-500">已选择 {selectedEntityIds.size} 项</div>
+              <button
+                onClick={handleSelectAll}
+                className="text-xs px-2.5 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                {selectedEntityIds.size === visibleFavorites.length && visibleFavorites.length > 0
+                  ? '取消'
+                  : '全选'}
+              </button>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              {activeCapabilities.canTag && (
+                <>
+                  <button
+                    onClick={() => setBatchTagDialogMode('add')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    加标签
+                  </button>
+                  <button
+                    onClick={() => setBatchTagDialogMode('remove')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    删标签
+                  </button>
+                </>
+              )}
               {activeCapabilities.canFavorite && (
-                <button
-                  onClick={handleBatchDelete}
-                  disabled={selectedEntityIds.size === 0}
-                  className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                    selectedEntityIds.size > 0
-                      ? 'bg-red-500 text-white hover:bg-red-600'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  取消收藏
-                </button>
+                <>
+                  <button
+                    onClick={() => void handleBatchFavoriteUpdate('add')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-rose-500 text-white hover:bg-rose-600'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    收藏
+                  </button>
+                  <button
+                    onClick={() => void handleBatchFavoriteUpdate('remove')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    取消收藏
+                  </button>
+                </>
               )}
               {activeCapabilities.canNote && (
                 <button
-                  onClick={handleBatchClearNotes}
+                  onClick={() => void handleBatchClearNotes()}
                   disabled={selectedEntityIds.size === 0}
                   className={`text-xs px-2.5 py-1 rounded transition-colors ${
                     selectedEntityIds.size > 0
@@ -887,8 +1022,34 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  清空笔记
+                  删除笔记
                 </button>
+              )}
+              {activeCapabilities.canArchive && (
+                <>
+                  <button
+                    onClick={() => void handleBatchArchiveUpdate('add')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-slate-600 text-white hover:bg-slate-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    归档
+                  </button>
+                  <button
+                    onClick={() => void handleBatchArchiveUpdate('remove')}
+                    disabled={selectedEntityIds.size === 0}
+                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
+                      selectedEntityIds.size > 0
+                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    取消归档
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -909,9 +1070,9 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
                   className={`h-full relative transition-transform ${
                     isSelectionMode && canUseSelectionMode ? 'cursor-pointer hover:scale-[1.01]' : ''
                   }`}
-                  onClick={
+                  onClickCapture={
                     isSelectionMode && canUseSelectionMode
-                      ? () => toggleSelection(getFavoriteItemEntityId(favoriteItem))
+                      ? (event) => handleSelectionCardClickCapture(event, getFavoriteItemEntityId(favoriteItem))
                       : undefined
                   }
                 >
@@ -1215,6 +1376,16 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
         <TagManagerDialog
           onClose={() => setShowTagManager(false)}
           onTagsChange={() => loadFavorites(true)}
+        />
+      )}
+
+      {batchTagDialogMode && (
+        <BatchTagDialog
+          mode={batchTagDialogMode}
+          tags={allTags}
+          selectedCount={selectedEntityIds.size}
+          onConfirm={handleBatchTagConfirm}
+          onClose={() => setBatchTagDialogMode(null)}
         />
       )}
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { DictionaryImportProgress, DictionaryParserType } from '../../shared/types'
+import { captureTelemetryEvent } from '../telemetry'
 
 interface DictionarySetupProps {
   onComplete: () => void
@@ -18,10 +19,18 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
     const unsubscribe = window.api.onDictionaryImportProgress((p) => {
       setProgress(p)
       if (p.stage === 'done') {
+        captureTelemetryEvent('dictionary_import_finished', {
+          success: true,
+          stage: p.stage
+        })
         setTimeout(() => {
           onComplete()
         }, 1000)
       } else if (p.stage === 'error') {
+        captureTelemetryEvent('dictionary_import_finished', {
+          success: false,
+          stage: p.stage
+        })
         setError(p.message)
         setIsImporting(false)
       }
@@ -53,10 +62,19 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
     setIsImporting(true)
     setError(null)
     setProgress({ stage: 'copying', current: 0, total: 1, message: '准备导入...' })
+    captureTelemetryEvent('dictionary_import_started', {
+      parser_type: parserType,
+      mdd_file_count: mddPaths.length,
+      has_mdd: mddPaths.length > 0
+    })
 
     const result = await window.api.importDictionary(mdxPath, mddPaths, parserType)
     
     if (!result.success) {
+      captureTelemetryEvent('dictionary_import_finished', {
+        success: false,
+        stage: 'import_result'
+      })
       setError(result.error || '导入失败')
       setIsImporting(false)
     }

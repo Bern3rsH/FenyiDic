@@ -10,6 +10,8 @@ import {
   isSystemTagName,
   EntityType,
   isEntityType,
+  isTelemetryEventName,
+  TelemetryEventProperties,
   CreateCustomEntryPayload,
   UpdateCustomEntryPayload,
   DeleteCustomEntryPayload,
@@ -31,6 +33,7 @@ import {
   getCardStats
 } from '../services/fsrs-service'
 import Store from 'electron-store'
+import { captureTelemetryEvent } from '../telemetry'
 
 // 用户设置存储
 interface StoreSchema {
@@ -40,6 +43,7 @@ interface StoreSchema {
   reviewDebugNoFsrs: boolean
   searchAutoPlay: boolean
   searchAutoPlayAccent: 'uk' | 'us'
+  readingDisplayMode: 'en' | 'cn' | 'both'
   tagModes: TagModeConfig[] | Record<string, string | string[]>
 }
 
@@ -51,6 +55,7 @@ const store = new Store<StoreSchema>({
     reviewDebugNoFsrs: false,
     searchAutoPlay: false,
     searchAutoPlayAccent: 'uk',
+    readingDisplayMode: 'both',
     tagModes: DEFAULT_TAG_MODE_CONFIGS.map((config) => ({ ...config }))
   }
 })
@@ -648,6 +653,20 @@ function deleteCustomWordCascade(
 }
 
 export function registerIpcHandlers(): void {
+  ipcMain.on(IPC_CHANNELS.CAPTURE_TELEMETRY_EVENT, (_event, eventName: unknown, properties?: unknown) => {
+    if (!isTelemetryEventName(eventName)) {
+      console.warn('[Telemetry] Invalid event name:', eventName)
+      return
+    }
+
+    if (properties !== undefined && (properties === null || typeof properties !== 'object' || Array.isArray(properties))) {
+      console.warn('[Telemetry] Invalid event properties for:', eventName)
+      return
+    }
+
+    captureTelemetryEvent(eventName, (properties || {}) as TelemetryEventProperties)
+  })
+
   const ensureSystemTagId = (tagName: string): number => {
     const database = getDatabase()
     const systemTagColor = tagName === SYSTEM_TAGS.FAVORITE.name
@@ -1815,6 +1834,36 @@ export function registerIpcHandlers(): void {
     }
   }
 
+  const normalizeEntityIdsForBatch = (rawEntityIds: unknown): number[] => {
+    if (!Array.isArray(rawEntityIds) || rawEntityIds.length === 0) {
+      throw new Error('Entity ids must be a non-empty array')
+    }
+
+    const entityIds = rawEntityIds.map((rawEntityId) => {
+      if (!Number.isInteger(rawEntityId) || rawEntityId === 0) {
+        throw new Error(`Invalid entity id: ${String(rawEntityId)}`)
+      }
+      return rawEntityId as number
+    })
+
+    return Array.from(new Set(entityIds))
+  }
+
+  const normalizeTagIdsForBatch = (rawTagIds: unknown): number[] => {
+    if (!Array.isArray(rawTagIds) || rawTagIds.length === 0) {
+      throw new Error('Tag ids must be a non-empty array')
+    }
+
+    const tagIds = rawTagIds.map((rawTagId) => {
+      if (!Number.isInteger(rawTagId) || rawTagId <= 0) {
+        throw new Error(`Invalid tag id: ${String(rawTagId)}`)
+      }
+      return rawTagId as number
+    })
+
+    return Array.from(new Set(tagIds))
+  }
+
   ipcMain.handle(
     IPC_CHANNELS.ADD_ENTITY_TAG,
     (_event, entityType: EntityType, entityId: number, tagId: number) => {
@@ -1832,6 +1881,57 @@ export function registerIpcHandlers(): void {
         return { success: false, error: `Invalid entity type: ${entityType}` }
       }
       return removeEntityTag(entityType, entityId, tagId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATE_ENTITY_TAGS_BATCH,
+    (
+      _event,
+      entityType: EntityType,
+      rawEntityIds: unknown,
+      rawTagIds: unknown,
+      operation: 'add' | 'remove'
+    ) => {
+      if (!isEntityType(entityType)) {
+        return { success: false, error: `Invalid entity type: ${entityType}` }
+      }
+
+      if (operation !== 'add' && operation !== 'remove') {
+        return { success: false, error: `Invalid batch tag operation: ${operation}` }
+      }
+
+      try {
+        const entityIds = normalizeEntityIdsForBatch(rawEntityIds)
+        const tagIds = normalizeTagIdsForBatch(rawTagIds)
+        const db = getDatabase()
+        const statement =
+          entityType === 'sense'
+            ? operation === 'add'
+              ? db.prepare(
+                  "INSERT OR IGNORE INTO user_db.sense_tags (sense_id, tag_id, created_at) VALUES (?, ?, datetime('now'))"
+                )
+              : db.prepare('DELETE FROM user_db.sense_tags WHERE sense_id = ? AND tag_id = ?')
+            : operation === 'add'
+              ? db.prepare(
+                  "INSERT OR IGNORE INTO user_db.word_tags (word_id, tag_id, created_at) VALUES (?, ?, datetime('now'))"
+                )
+              : db.prepare('DELETE FROM user_db.word_tags WHERE word_id = ? AND tag_id = ?')
+
+        const transaction = db.transaction((ids: number[], selectedTagIds: number[]) => {
+          for (const entityId of ids) {
+            for (const tagId of selectedTagIds) {
+              statement.run(entityId, tagId)
+            }
+          }
+        })
+
+        transaction(entityIds, tagIds)
+        return { success: true }
+      } catch (error) {
+        console.error('Batch entity tag update failed', error)
+        return { success: false, error: String(error) }
+      }
     }
   )
 
@@ -2056,6 +2156,32 @@ export function registerIpcHandlers(): void {
       return { success: true }
     } catch (error) {
       console.error('Delete note failed:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.DELETE_ENTITY_NOTES_BATCH, (_event, entityType: EntityType, rawEntityIds: unknown) => {
+    if (!isEntityType(entityType)) {
+      return { success: false, error: `Invalid entity type: ${entityType}` }
+    }
+
+    const db = getDatabase()
+    try {
+      const entityIds = normalizeEntityIdsForBatch(rawEntityIds)
+      const statement =
+        entityType === 'sense'
+          ? db.prepare('DELETE FROM user_db.sense_notes WHERE sense_id = ?')
+          : db.prepare('DELETE FROM user_db.word_notes WHERE word_id = ?')
+      const transaction = db.transaction((ids: number[]) => {
+        for (const entityId of ids) {
+          statement.run(entityId)
+        }
+      })
+
+      transaction(entityIds)
+      return { success: true }
+    } catch (error) {
+      console.error('Batch delete entity notes failed:', error)
       return { success: false, error: String(error) }
     }
   })
