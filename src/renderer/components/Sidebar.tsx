@@ -39,6 +39,8 @@ interface SidebarProps {
   onToggleSelectionMode: () => void
 }
 
+const SHOW_CSV_IMPORT_BUTTON = false
+
 export default function Sidebar({
   activeTab,
   entityCounts,
@@ -358,15 +360,17 @@ export default function Sidebar({
           </button>
         )}
 
-        <button
-          onClick={onImport}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          导入 CSV
-        </button>
+        {SHOW_CSV_IMPORT_BUTTON && (
+          <button
+            onClick={onImport}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            导入 CSV
+          </button>
+        )}
       </div>
     </div>
   )
