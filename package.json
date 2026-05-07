@@ -1,6 +1,6 @@
 {
   "name": "fenyidic",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A dictionary app with sense-level bookmarking and tagging",
   "private": true,
   "license": "UNLICENSED",
@@ -14,7 +14,7 @@
     "pack:dev": "npm run build && electron-builder --dir -c.appId=com.fenyidic.dict.dev -c.productName='分义词典 Dev' -c.artifactName='fenyidic-dev-${version}-${arch}.${ext}'",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
-    "release:mac": "npm run build && electron-builder --mac --publish always",
+    "release:mac": "npm run build && electron-builder --mac --arm64 --x64 --publish always",
     "dist:mac:dev": "npm run build && electron-builder --mac -c.appId=com.fenyidic.dict.dev -c.productName='分义词典 Dev' -c.artifactName='fenyidic-dev-${version}-${arch}.${ext}'",
     "db:build": "npm rebuild better-sqlite3 && node scripts/build-db.js && npm run postinstall"
   },
@@ -25,7 +25,6 @@
     "directories": {
       "output": "release"
     },
-    "electronDist": "node_modules/electron/dist",
     "files": [
       "out/**/*"
     ],
