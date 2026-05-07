@@ -29,6 +29,7 @@ resources/dict.db-wal
 # Temp files
 temp_*.html
 *.tmp
+build/.icon-icns/
 
 # TypeScript build cache
 *.tsbuildinfo

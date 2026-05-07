@@ -30,6 +30,7 @@
     ],
     "mac": {
       "category": "public.app-category.reference",
+      "icon": "build/icon.icns",
       "sign": "scripts/sign-mac-ad-hoc.js",
       "target": [
         "default"

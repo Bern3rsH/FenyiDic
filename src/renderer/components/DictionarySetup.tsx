@@ -6,6 +6,9 @@ interface DictionarySetupProps {
   onComplete: () => void
 }
 
+const OXFORD_DICTIONARY_DOWNLOAD_URL =
+  'https://drive.google.com/file/d/1R9DM3QP9mBaLhnQ2bCrCUp_UJdLgp90l/view?usp=sharing'
+
 export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
   const [mdxPath, setMdxPath] = useState<string | null>(null)
   const [mddPaths, setMddPaths] = useState<string[]>([])
@@ -98,6 +101,18 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
           <p className="text-gray-500 text-sm">
             请选择你的 MDX 词典文件开始使用
           </p>
+          <p className="mt-3 text-xs leading-5 text-gray-500">
+            为规避版权问题，请自行下载下面的牛津双解词典文件后导入，且目前应用只支持此 MDX
+            词典文件，暂不支持别的 MDX 词典文件：
+            <a
+              href={OXFORD_DICTIONARY_DOWNLOAD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="block mt-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+            >
+              下载牛津双解词典文件
+            </a>
+          </p>
         </div>
 
         {/* Progress */}
@@ -176,7 +191,7 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>选择 MDD 文件（发音音频）</span>
+                    <span>选择 MDD 文件（多选，共 4 个）</span>
                   </>
                 )}
               </button>

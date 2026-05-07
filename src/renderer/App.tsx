@@ -53,6 +53,7 @@ function formatReleaseNotesForDialog(releaseNotes: string | null | undefined): s
 function App() {
   // 词典状态
   const [hasDictionary, setHasDictionary] = useState<boolean | null>(null)
+  const [showDevDictionarySetup, setShowDevDictionarySetup] = useState(false)
   
   const [view, setView] = useState<View>('search')
   const [selectedWordId, setSelectedWordId] = useState<number | null>(null)
@@ -151,7 +152,8 @@ function App() {
         `最新版本：${updateCheckResult.updateInfo.version}`,
         updateCheckResult.updateInfo.releaseName ? `版本名称：${updateCheckResult.updateInfo.releaseName}` : null,
         `本次更新内容：\n${releaseNotes}`,
-        '是否前往 GitHub Releases 下载新版安装包？'
+        '是否前往 GitHub Releases 下载新版安装包？',
+        '（每次安装完后都需要去系统设置中的隐私与安全性中点击“仍要打开”）'
       ]
         .filter(Boolean)
         .join('\n\n')
@@ -463,6 +465,34 @@ function App() {
         ? 'bg-blue-600 text-white shadow-sm shadow-blue-100'
         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
     }`
+  const devFloatingButtonBaseClass =
+    'rounded-full border px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur transition-colors'
+  const devTools = import.meta.env.DEV ? (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-wrap justify-end gap-2">
+      <button
+        onClick={() => setShowDevDictionarySetup((previousValue) => !previousValue)}
+        className={`${devFloatingButtonBaseClass} ${
+          showDevDictionarySetup
+            ? 'border-blue-500 bg-blue-100/95 text-blue-700 hover:bg-blue-200'
+            : 'border-gray-200 bg-white/95 text-gray-600 hover:bg-gray-50'
+        }`}
+        title="开发模式：切换显示词典导入初始流程"
+      >
+        {showDevDictionarySetup ? '返回应用' : '导入流程'}
+      </button>
+      <button
+        onClick={() => setReviewDebugNoFsrs((prev) => !prev)}
+        className={`${devFloatingButtonBaseClass} ${
+          reviewDebugNoFsrs
+            ? 'border-amber-500 bg-amber-100/95 text-amber-700 hover:bg-amber-200'
+            : 'border-gray-200 bg-white/95 text-gray-600 hover:bg-gray-50'
+        }`}
+        title="开发模式：开启后复习结果不会写入 FSRS"
+      >
+        调试FSRS: {reviewDebugNoFsrs ? '不写入' : '正常'}
+      </button>
+    </div>
+  ) : null
 
   // 词典导入完成后刷新
   const handleDictionaryImportComplete = () => {
@@ -482,7 +512,23 @@ function App() {
 
   // 无词典，显示导入页面
   if (!hasDictionary) {
-    return <DictionarySetup onComplete={handleDictionaryImportComplete} />
+    return (
+      <>
+        <DictionarySetup onComplete={handleDictionaryImportComplete} />
+        {devTools}
+        {DialogComponent}
+      </>
+    )
+  }
+
+  if (showDevDictionarySetup) {
+    return (
+      <>
+        <DictionarySetup onComplete={handleDictionaryImportComplete} />
+        {devTools}
+        {DialogComponent}
+      </>
+    )
   }
 
   return (
@@ -655,19 +701,7 @@ function App() {
         )}
       </main>
 
-      {import.meta.env.DEV && (
-        <button
-          onClick={() => setReviewDebugNoFsrs((prev) => !prev)}
-          className={`fixed bottom-4 right-4 z-50 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur transition-colors ${
-            reviewDebugNoFsrs
-              ? 'border-amber-500 bg-amber-100/95 text-amber-700 hover:bg-amber-200'
-              : 'border-gray-200 bg-white/95 text-gray-600 hover:bg-gray-50'
-          }`}
-          title="开发模式：开启后复习结果不会写入 FSRS"
-        >
-          调试FSRS: {reviewDebugNoFsrs ? '不写入' : '正常'}
-        </button>
-      )}
+      {devTools}
       {DialogComponent}
     </div>
   )
