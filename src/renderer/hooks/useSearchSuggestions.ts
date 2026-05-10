@@ -18,6 +18,16 @@ interface UseSearchSuggestionsResult {
   clearResults: () => void
 }
 
+function resultMatchesQuery(result: SearchResultItem, normalizedQuery: string): boolean {
+  const normalizedSearchQuery = normalizedQuery.toLowerCase()
+
+  return [
+    result.headword,
+    result.lookupHeadword,
+    result.matchedHeadword
+  ].some((headword) => headword?.toLowerCase().startsWith(normalizedSearchQuery))
+}
+
 export function useSearchSuggestions({
   initialQuery = '',
   enabled = true,
@@ -26,15 +36,19 @@ export function useSearchSuggestions({
   errorLogMessage
 }: UseSearchSuggestionsOptions): UseSearchSuggestionsResult {
   const [query, setQueryState] = useState(initialQuery)
-  const [results, setResults] = useState<SearchResultItem[]>([])
+  const [resultSnapshot, setResultSnapshot] = useState<{
+    query: string
+    items: SearchResultItem[]
+  }>({ query: initialQuery.trim(), items: [] })
   const [loading, setLoading] = useState(false)
   const requestIdRef = useRef(0)
   const latestQueryRef = useRef(initialQuery)
   const normalizedQuery = query.trim()
+  const results = resultSnapshot.query === normalizedQuery ? resultSnapshot.items : []
 
   const clearResults = useCallback(() => {
     requestIdRef.current += 1
-    setResults([])
+    setResultSnapshot({ query: latestQueryRef.current.trim(), items: [] })
     setLoading(false)
   }, [])
 
@@ -69,11 +83,16 @@ export function useSearchSuggestions({
           return
         }
 
-        setResults(searchResults.slice(0, limit))
+        setResultSnapshot({
+          query: normalizedQuery,
+          items: searchResults
+            .filter((result) => resultMatchesQuery(result, normalizedQuery))
+            .slice(0, limit)
+        })
       } catch (error) {
         if (requestIdRef.current === requestId) {
           console.error(errorLogMessage, error)
-          setResults([])
+          setResultSnapshot({ query: normalizedQuery, items: [] })
         }
       } finally {
         if (requestIdRef.current === requestId) {

@@ -819,6 +819,10 @@ export function registerIpcHandlers(): void {
       definition_html: string
       dict_name: string
     }) => {
+      if (!isExactHeadwordMatchIgnoreCase(result.lookup_headword, normalizedQuery.toLowerCase())) {
+        return { resolvedResult: result, redirectLookupHeadword: null }
+      }
+
       const redirectLookupHeadword = extractDirectRedirectLookupHeadword(result.definition_html)
       if (!redirectLookupHeadword || redirectLookupHeadword === result.lookup_headword) {
         return { resolvedResult: result, redirectLookupHeadword: null }
@@ -859,6 +863,7 @@ export function registerIpcHandlers(): void {
           id: resolvedResult.id,
           headword: variant.displayHeadword,
           lookupHeadword: getPreferredVariantLookupHeadword(variant, variantMatchQuery),
+          matchedHeadword: redirectLookupHeadword ? result.lookup_headword : undefined,
           dict_name: resolvedResult.dict_name,
           ...getVariantSearchRank(variant, variantMatchQuery)
         }))

@@ -212,6 +212,7 @@ export interface SearchResultItem {
   id: number
   headword: string
   lookupHeadword?: string
+  matchedHeadword?: string
   dict_name: string
 }
 
