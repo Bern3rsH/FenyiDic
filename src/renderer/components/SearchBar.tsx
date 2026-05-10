@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { SearchResultItem } from '../../shared/types'
+import { useSearchSuggestions } from '../hooks/useSearchSuggestions'
 import ManualEntryDialog from './ManualEntryDialog'
 
 interface SearchBarProps {
@@ -14,6 +15,7 @@ interface HistoryItem {
 }
 
 const MAX_SEARCH_SUGGESTION_RESULTS = 10
+const SEARCH_SUGGESTION_DEBOUNCE_MS = 150
 const MANUAL_ENTRY_QUERY_PREVIEW_LENGTH = 24
 
 function buildManualEntryPreview(query: string): string {
@@ -25,48 +27,26 @@ function buildManualEntryPreview(query: string): string {
 }
 
 function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: SearchBarProps) {
-  const [query, setQuery] = useState(initialQuery)
-  const [results, setResults] = useState<SearchResultItem[]>([])
-  const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [isNavDropdownOpen, setIsNavDropdownOpen] = useState(false)
   const [isManualEntryDialogOpen, setIsManualEntryDialogOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const {
+    query,
+    normalizedQuery,
+    results,
+    loading,
+    setQuery: updateQuery,
+    clearResults
+  } = useSearchSuggestions({
+    initialQuery,
+    limit: MAX_SEARCH_SUGGESTION_RESULTS,
+    debounceMs: SEARCH_SUGGESTION_DEBOUNCE_MS,
+    errorLogMessage: 'Search failed:'
+  })
   const isNavVariant = variant === 'nav'
-  const normalizedQuery = query.trim()
   const canCreateManualEntry = normalizedQuery.length > 0
   const manualEntryPreview = buildManualEntryPreview(normalizedQuery)
-
-  const search = useCallback(async (q: string) => {
-    const normalizedSearchQuery = q.trim()
-
-    if (normalizedSearchQuery.length < 1) {
-      setResults([])
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await window.api.searchWord(normalizedSearchQuery)
-      setResults(res.slice(0, MAX_SEARCH_SUGGESTION_RESULTS))
-    } catch (err) {
-      console.error('Search failed:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      search(query)
-    }, 150)
-
-    return () => clearTimeout(timer)
-  }, [query, search])
-
-  useEffect(() => {
-    setQuery(initialQuery)
-  }, [initialQuery])
 
   useEffect(() => {
     try {
@@ -109,14 +89,14 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
 
   const handleResultSelect = (result: SearchResultItem) => {
     saveToHistory({ id: result.id, headword: result.headword })
-    setQuery(result.headword)
+    updateQuery(result.headword)
     setIsNavDropdownOpen(false)
     onWordSelect(result.id, result.headword)
   }
 
   const handleHistorySelect = (item: HistoryItem) => {
     saveToHistory(item)
-    setQuery(item.headword)
+    updateQuery(item.headword)
     setIsNavDropdownOpen(false)
     onWordSelect(item.id, item.headword)
   }
@@ -155,8 +135,8 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
 
   const handleCustomEntryCreated = (wordId: number, headword: string) => {
     saveToHistory({ id: wordId, headword })
-    setQuery(headword)
-    setResults([])
+    updateQuery(headword)
+    clearResults()
     setIsManualEntryDialogOpen(false)
     onWordSelect(wordId, headword)
   }
@@ -169,14 +149,14 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
     <div ref={containerRef} className="relative">
       {!isNavVariant && (
         <div className="pointer-events-none absolute inset-x-0 -top-16 text-center">
-          <h2 className="text-4xl font-semibold tracking-wide text-gray-800">分义词典</h2>
+          <h2 className="text-4xl font-semibold tracking-wide text-gray-800">FenyiDic 分义词典</h2>
         </div>
       )}
 
       <input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => updateQuery(e.target.value)}
         onFocus={handleInputFocus}
         placeholder="输入并搜索"
         className={searchInputClassName}

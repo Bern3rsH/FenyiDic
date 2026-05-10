@@ -106,6 +106,7 @@ export default function ReviewApp() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [isReviewComplete, setIsReviewComplete] = useState(false)
   const [loading, setLoading] = useState(true)
   const [displayMode, setDisplayMode] = useState<'en' | 'cn' | 'both'>('both')
   const [autoPlay, setAutoPlay] = useState(false)
@@ -233,6 +234,7 @@ export default function ReviewApp() {
       setSkippedReadItemKeys([])
       setCurrentIndex(0)
       setIsFlipped(false)
+      setIsReviewComplete(false)
 
       const hasReadModeItems = combined.some((reviewItem) => resolveReviewMode(reviewItem) === 'read')
       if (hasReadModeItems) {
@@ -321,6 +323,7 @@ export default function ReviewApp() {
     setItems(nextItems)
     setCurrentIndex(0)
     setIsFlipped(false)
+    setIsReviewComplete(false)
     setReviewStage('review')
   }, [loadedItems, skippedReadItemKeySet])
 
@@ -373,8 +376,15 @@ export default function ReviewApp() {
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1)
       setIsFlipped(false)
+      return
     }
+
+    setIsReviewComplete(true)
   }
+
+  const handleCloseReviewWindow = useCallback(() => {
+    window.close()
+  }, [])
 
   const handleKnow = async () => {
     // FSRS: Rate as Good (3)
@@ -495,6 +505,7 @@ export default function ReviewApp() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat) return
       if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isReviewComplete) return
 
       if (shouldIgnoreReviewShortcut(event.target)) {
         return
@@ -524,7 +535,7 @@ export default function ReviewApp() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isArchiving, isFlipped, handleDontKnow, handleFuzzy, handleKnow])
+  }, [isArchiving, isFlipped, isReviewComplete, handleDontKnow, handleFuzzy, handleKnow])
 
   const handlePlayAudio = useCallback(async (accent: 'uk' | 'us') => {
     if (!currentItem) return
@@ -667,10 +678,26 @@ export default function ReviewApp() {
          />
       )}
 
-      {/* 底部提示 - 完成所有卡片 */}
-      {currentIndex === items.length - 1 && isFlipped && (
-        <div className="px-6 mt-4 text-center text-sm text-gray-400">
-          已是最后一张卡片
+      {isReviewComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">已完成本次复习</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              本次队列中的所有卡片都已处理完成。
+            </p>
+            <button
+              type="button"
+              onClick={handleCloseReviewWindow}
+              className="mt-6 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              关闭复习窗口
+            </button>
+          </div>
         </div>
       )}
     </div>

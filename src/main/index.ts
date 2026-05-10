@@ -22,8 +22,10 @@ autoUpdater.logger = console
 autoUpdater.autoDownload = false
 autoUpdater.fullChangelog = false
 
-const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/fenyidic/releases/latest'
+const APP_DISPLAY_NAME = 'FenyiDic'
+const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/FenyiDic/releases/latest'
 
+app.setName(APP_DISPLAY_NAME)
 initializeTelemetry()
 
 let manualUpdateCheckPromise: Promise<AppUpdateCheckResult> | null = null
@@ -147,7 +149,7 @@ function configureApplicationMenu(): void {
 
   const applicationMenuTemplate: MenuItemConstructorOptions[] = [
     {
-      label: app.name,
+      label: APP_DISPLAY_NAME,
       submenu: [
         { role: 'about' },
         {

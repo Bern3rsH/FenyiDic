@@ -4,6 +4,7 @@ import type { SearchResultItem } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
 import SenseCard from './components/SenseCard'
 import WordPronunciation from './components/WordPronunciation'
+import { useSearchSuggestions } from './hooks/useSearchSuggestions'
 import { useBodyScrollLock } from './utils/scrollLock'
 
 declare global {
@@ -1414,14 +1415,25 @@ export default function ReadingApp() {
   const [selectedBatchEntryIds, setSelectedBatchEntryIds] = useState<Set<string>>(new Set())
   const [isBatchTagDialogOpen, setIsBatchTagDialogOpen] = useState(false)
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
-  const [lookupSearchInputValue, setLookupSearchInputValue] = useState('')
-  const [lookupSearchResults, setLookupSearchResults] = useState<SearchResultItem[]>([])
-  const [isLookupSearchLoading, setIsLookupSearchLoading] = useState(false)
   const [isLookupSearchDropdownOpen, setIsLookupSearchDropdownOpen] = useState(false)
   const [isGuideDrawerOpen, setIsGuideDrawerOpen] = useState(false)
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false)
   const lookupRequestIdRef = useRef(0)
-  const lookupSuggestionRequestIdRef = useRef(0)
+  const lookupSearchSuggestionsEnabled =
+    readingStage === 'reading' && lookupPanelState.normalizedToken !== ''
+  const {
+    query: lookupSearchInputValue,
+    results: lookupSearchResults,
+    loading: isLookupSearchLoading,
+    setQuery: setLookupSearchInputValue,
+    clearResults: clearLookupSearchResults
+  } = useSearchSuggestions({
+    initialQuery: lookupPanelState.queryText,
+    enabled: lookupSearchSuggestionsEnabled,
+    limit: READING_LOOKUP_SUGGESTION_LIMIT,
+    debounceMs: READING_LOOKUP_SEARCH_DEBOUNCE_MS,
+    errorLogMessage: 'Search reading lookup suggestions failed:'
+  })
 
   const normalizedDraftText = draftText.trim()
   const canStartReading = normalizedDraftText.length > 0
@@ -1465,11 +1477,9 @@ export default function ReadingApp() {
 
   const resetLookupInteractionState = () => {
     lookupRequestIdRef.current += 1
-    lookupSuggestionRequestIdRef.current += 1
     setLookupPanelState(createIdleLookupPanelState())
     setLookupSearchInputValue('')
-    setLookupSearchResults([])
-    setIsLookupSearchLoading(false)
+    clearLookupSearchResults()
     setIsLookupSearchDropdownOpen(false)
   }
 
@@ -1511,10 +1521,6 @@ export default function ReadingApp() {
       window.removeEventListener('focus', loadReadingSettings)
     }
   }, [])
-
-  useEffect(() => {
-    setLookupSearchInputValue(lookupPanelState.queryText)
-  }, [lookupPanelState.queryText])
 
   useEffect(() => {
     if (!readingSessionId || readingStage === 'input' || committedText.trim().length === 0) {
@@ -1569,53 +1575,6 @@ export default function ReadingApp() {
       return nextEntryIds
     })
   }, [selectedSenseEntries])
-
-  useEffect(() => {
-    const normalizedLookupSearchInput = lookupSearchInputValue.trim()
-
-    if (
-      readingStage !== 'reading' ||
-      lookupPanelState.normalizedToken === '' ||
-      normalizedLookupSearchInput.length === 0
-    ) {
-      lookupSuggestionRequestIdRef.current += 1
-      setLookupSearchResults([])
-      setIsLookupSearchLoading(false)
-      return
-    }
-
-    const requestId = lookupSuggestionRequestIdRef.current + 1
-    lookupSuggestionRequestIdRef.current = requestId
-
-    const timerId = window.setTimeout(async () => {
-      setIsLookupSearchLoading(true)
-
-      try {
-        const searchResults = await window.api.searchWord(
-          normalizedLookupSearchInput,
-          READING_LOOKUP_SUGGESTION_LIMIT
-        )
-        if (lookupSuggestionRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setLookupSearchResults(searchResults.slice(0, READING_LOOKUP_SUGGESTION_LIMIT))
-      } catch (error) {
-        console.error('Search reading lookup suggestions failed:', error)
-        if (lookupSuggestionRequestIdRef.current !== requestId) {
-          return
-        }
-
-        setLookupSearchResults([])
-      } finally {
-        if (lookupSuggestionRequestIdRef.current === requestId) {
-          setIsLookupSearchLoading(false)
-        }
-      }
-    }, READING_LOOKUP_SEARCH_DEBOUNCE_MS)
-
-    return () => window.clearTimeout(timerId)
-  }, [lookupPanelState.normalizedToken, lookupSearchInputValue, readingStage])
 
   const loadLookupByWordId = async (
     wordId: number,
@@ -1951,7 +1910,7 @@ export default function ReadingApp() {
         : null
 
     setLookupSearchInputValue(result.headword)
-    setLookupSearchResults([])
+    clearLookupSearchResults()
     setIsLookupSearchDropdownOpen(false)
 
     await loadLookupByWordId(

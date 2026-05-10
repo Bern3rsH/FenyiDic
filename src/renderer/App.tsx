@@ -582,8 +582,7 @@ function App() {
               className="select-none whitespace-nowrap text-left text-xl text-gray-800 transition-colors hover:text-gray-950"
               title="返回查词页"
             >
-              <span className="text-2xl font-black">分义</span>
-              <span className="ml-1 font-normal">词典</span>
+              <span className="text-2xl font-black">FenyiDic</span>
             </button>
           </div>
 

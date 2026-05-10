@@ -154,7 +154,7 @@ export function initializeTelemetry(): void {
   if (sentryDsn) {
     Sentry.init({
       dsn: sentryDsn,
-      release: `fenyidic@${app.getVersion()}`,
+      release: `FenyiDic@${app.getVersion()}`,
       environment: getTelemetryEnvironment(),
       tracesSampleRate: 0,
       beforeSend(event) {
