@@ -11,16 +11,16 @@
     "preview": "FENYIDIC_RUNTIME_ENV=development electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
     "pack": "npm run build && electron-builder --dir",
-    "pack:dev": "npm run build && electron-builder --dir -c.appId=com.fenyidic.dict.dev -c.productName='FenyiDic 分义词典 Dev' -c.artifactName='FenyiDic-dev-${version}-${arch}.${ext}'",
+    "pack:dev": "npm run build && electron-builder --dir -c.appId=com.fenyidic.dict.dev -c.productName='FenyiDic Dev' -c.artifactName='FenyiDic-dev-${version}-${arch}.${ext}'",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "release:mac": "npm run build && electron-builder --mac --arm64 --x64 --publish always",
-    "dist:mac:dev": "npm run build && electron-builder --mac -c.appId=com.fenyidic.dict.dev -c.productName='FenyiDic 分义词典 Dev' -c.artifactName='FenyiDic-dev-${version}-${arch}.${ext}'",
+    "dist:mac:dev": "npm run build && electron-builder --mac -c.appId=com.fenyidic.dict.dev -c.productName='FenyiDic Dev' -c.artifactName='FenyiDic-dev-${version}-${arch}.${ext}'",
     "db:build": "npm rebuild better-sqlite3 && node scripts/build-db.js && npm run postinstall"
   },
   "build": {
     "appId": "com.fenyidic.dict",
-    "productName": "FenyiDic 分义词典",
+    "productName": "FenyiDic",
     "artifactName": "FenyiDic-${version}-${arch}.${ext}",
     "directories": {
       "output": "release"
@@ -38,7 +38,7 @@
     },
     "protocols": [
       {
-        "name": "FenyiDic 分义词典",
+        "name": "FenyiDic",
         "schemes": [
           "fenyidic"
         ]
