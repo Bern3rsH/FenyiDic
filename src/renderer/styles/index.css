@@ -59,6 +59,8 @@ body {
 /* 自定义义项卡片样式 */
 .sense-card {
   @apply bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* 自定义左边框宽度 */
@@ -68,26 +70,41 @@ body {
 
 .sense-card .definition {
   @apply leading-relaxed;
+  overflow-wrap: anywhere;
 }
 
 .sense-card .definition-cn {
   @apply leading-relaxed mt-1;
+  overflow-wrap: anywhere;
 }
 
 .sense-card .examples {
   @apply mt-3 space-y-2;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sense-card .example-item {
   @apply pl-3 border-l-2 border-blue-200;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sense-card .example {
   @apply text-gray-500 text-sm;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .sense-card .example-cn {
   @apply text-gray-500 text-sm;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.sense-card .example :where(a, span, em, strong),
+.sense-card .example-cn :where(a, span, em, strong) {
+  overflow-wrap: anywhere;
 }
 
 .sense-card .tags {
@@ -105,11 +122,31 @@ body {
 
 /* 收藏按钮样式 */
 .favorite-btn {
-  @apply p-1 rounded-full hover:bg-gray-100 transition-colors;
+  @apply rounded-full bg-white p-1 ring-1 ring-transparent transition-colors hover:bg-gray-100;
 }
 
 .favorite-btn.active {
-  @apply text-red-500 bg-red-50;
+  @apply bg-white text-red-500 ring-transparent hover:bg-white hover:ring-red-400;
+}
+
+.favorite-btn.is-tag-active {
+  @apply bg-white text-indigo-500 ring-transparent hover:bg-white hover:ring-indigo-400;
+}
+
+.favorite-btn.is-archive-active {
+  @apply bg-white text-gray-600 ring-transparent hover:bg-white hover:ring-gray-400;
+}
+
+.favorite-btn.is-note-active {
+  @apply bg-white text-yellow-600 ring-transparent hover:bg-white hover:ring-yellow-400;
+}
+
+.favorite-btn.is-example-active {
+  @apply bg-white text-blue-500 ring-transparent hover:bg-white hover:ring-blue-400;
+}
+
+.favorite-btn.is-menu-active {
+  @apply bg-white text-gray-500 ring-transparent hover:bg-white hover:ring-gray-400;
 }
 
 /* 习语卡片样式 - 浅色背景区分 */
@@ -120,4 +157,3 @@ body {
 .sense-card-idiom .example {
   @apply border-amber-300;
 }
-

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode }
 import { SYSTEM_TAGS } from '../shared/types'
 import type { SearchResultItem } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
+import ArchiveIcon from './components/ArchiveIcon'
 import SenseCard from './components/SenseCard'
+import TagSelector from './components/TagSelector'
 import WordPronunciation from './components/WordPronunciation'
 import { useSearchSuggestions } from './hooks/useSearchSuggestions'
 import { useBodyScrollLock } from './utils/scrollLock'
@@ -16,6 +18,7 @@ declare global {
 type ReadingStage = 'input' | 'markWords' | 'reading' | 'shuffleCn' | 'wordStudy' | 'batch'
 type ReadingFlowStepId = 'input' | 'markWords' | 'lookup' | 'shuffleCn' | 'wordStudy' | 'batch'
 type DefinitionDisplayMode = 'en' | 'cn' | 'both'
+type ActiveReadingStage = Exclude<ReadingStage, 'input'>
 type ReadingFlowStepMeta = {
   label: string
 }
@@ -44,6 +47,7 @@ interface LookupWordData {
   phon_us?: string
   definition_html: string
   tags?: Tag[]
+  note?: string
 }
 
 interface LookupSenseData {
@@ -59,6 +63,11 @@ interface LookupSenseData {
   is_favorited: number
   favorite_note?: string
   tags: Tag[]
+}
+
+interface LookupSensePosGroup {
+  posTitle: string
+  senses: LookupSenseData[]
 }
 
 interface ReadingTextToken {
@@ -151,8 +160,25 @@ const EXCESSIVE_PARAGRAPH_BREAK_PATTERN = /\n{3,}/g
 const PARAGRAPH_SEPARATOR_PATTERN = /\n{2,}/
 const SINGLE_NEWLINE_PATTERN = /\n/g
 const INLINE_WHITESPACE_PATTERN = /[ \t]+/g
+const SENTENCE_ENDING_LINE_PATTERN = /[.!?…]["'”’)\]]*$/
+const PARAGRAPH_START_LINE_PATTERN = /^(?:["'“‘(\[])?[A-Z0-9]/
+const LIST_ITEM_LINE_PATTERN = /^(?:[-*•]|\d+[.)])\s+/
+const DEFAULT_READING_WRAP_LENGTH = 72
+const MIN_WRAP_LENGTH_SAMPLE = 24
+const HARD_WRAP_LINE_CLUSTER_TOLERANCE = 12
+const HARD_WRAP_CONFIDENCE_THRESHOLD = 0.6
+const PARAGRAPH_BREAK_SHORT_LINE_RATIO = 0.75
 const READING_TOKEN_PATTERN = /[A-Za-z]+(?:[-'][A-Za-z]+)*|\s+|[^A-Za-z\s]+/g
 const WORD_TOKEN_TEST_PATTERN = /^[A-Za-z]+(?:[-'][A-Za-z]+)*$/
+const LOOKUP_SENSE_POS_ORDER = [
+  'noun 名词',
+  'verb 动词',
+  'adjective 形容词',
+  'adverb 副词',
+  'preposition 介词',
+  'definitions 释义',
+  'idiom 习语'
+] as const
 const READING_FLOW_STEP_META: Readonly<Record<ReadingFlowStepId, ReadingFlowStepMeta>> = {
   input: {
     label: '输入文本'
@@ -324,20 +350,68 @@ const READING_GUIDE_SECTIONS: ReadonlyArray<ReadingGuideSection> = [
 ] as const
 
 function normalizePastedArticleText(input: string): string {
-  return input
+  const normalizedInput = input
     .replace(SOFT_HYPHEN_PATTERN, '')
     .replace(WINDOWS_NEWLINE_PATTERN, '\n')
     .replace(HYPHENATED_LINE_BREAK_PATTERN, '$1$2')
     .replace(EXCESSIVE_PARAGRAPH_BREAK_PATTERN, '\n\n')
-    .split(PARAGRAPH_SEPARATOR_PATTERN)
-    .map((paragraph) =>
-      paragraph
-        .replace(SINGLE_NEWLINE_PATTERN, ' ')
-        .replace(INLINE_WHITESPACE_PATTERN, ' ')
-        .trim()
-    )
-    .filter((paragraph) => paragraph.length > 0)
-    .join('\n\n')
+  const rawLines = normalizedInput.split(SINGLE_NEWLINE_PATTERN)
+  const estimatedWrapLength = estimateReadingWrapLength(rawLines)
+  const isLikelyHardWrappedText = detectLikelyHardWrappedText(rawLines, estimatedWrapLength)
+  const paragraphs: string[] = []
+  let currentParagraphLines: string[] = []
+
+  const flushCurrentParagraph = () => {
+    if (currentParagraphLines.length === 0) {
+      return
+    }
+
+    const paragraphText = currentParagraphLines
+      .join(' ')
+      .replace(INLINE_WHITESPACE_PATTERN, ' ')
+      .trim()
+
+    if (paragraphText.length > 0) {
+      paragraphs.push(paragraphText)
+    }
+
+    currentParagraphLines = []
+  }
+
+  rawLines.forEach((rawLine) => {
+    const normalizedLine = normalizeReadingLine(rawLine)
+
+    if (normalizedLine.length === 0) {
+      flushCurrentParagraph()
+      return
+    }
+
+    if (currentParagraphLines.length === 0) {
+      currentParagraphLines = [normalizedLine]
+      return
+    }
+
+    const previousLine = currentParagraphLines[currentParagraphLines.length - 1]
+
+    if (
+      shouldPreserveSingleLineParagraphBreak(
+        previousLine,
+        normalizedLine,
+        estimatedWrapLength,
+        isLikelyHardWrappedText
+      )
+    ) {
+      flushCurrentParagraph()
+      currentParagraphLines = [normalizedLine]
+      return
+    }
+
+    currentParagraphLines.push(normalizedLine)
+  })
+
+  flushCurrentParagraph()
+
+  return paragraphs.join('\n\n')
 }
 
 function buildReadingParagraphs(articleText: string): ReadingParagraph[] {
@@ -373,6 +447,82 @@ function buildReadingParagraphs(articleText: string): ReadingParagraph[] {
         }
       })
     }))
+}
+
+function normalizeReadingLine(line: string): string {
+  return line.replace(INLINE_WHITESPACE_PATTERN, ' ').trim()
+}
+
+function estimateReadingWrapLength(lines: string[]): number {
+  const lineLengths = lines
+    .map((line) => normalizeReadingLine(line).length)
+    .filter((lineLength) => lineLength >= MIN_WRAP_LENGTH_SAMPLE)
+    .sort((left, right) => left - right)
+
+  if (lineLengths.length === 0) {
+    return DEFAULT_READING_WRAP_LENGTH
+  }
+
+  return lineLengths[Math.floor(lineLengths.length / 2)]
+}
+
+function detectLikelyHardWrappedText(lines: string[], estimatedWrapLength: number): boolean {
+  const normalizedLines = lines
+    .map(normalizeReadingLine)
+    .filter((line) => line.length >= MIN_WRAP_LENGTH_SAMPLE)
+
+  if (normalizedLines.length < 3) {
+    return false
+  }
+
+  const clusteredLineCount = normalizedLines.filter(
+    (line) => Math.abs(line.length - estimatedWrapLength) <= HARD_WRAP_LINE_CLUSTER_TOLERANCE
+  ).length
+
+  return clusteredLineCount / normalizedLines.length >= HARD_WRAP_CONFIDENCE_THRESHOLD
+}
+
+function shouldPreserveSingleLineParagraphBreak(
+  previousLine: string,
+  nextLine: string,
+  estimatedWrapLength: number,
+  isLikelyHardWrappedText: boolean
+): boolean {
+  if (LIST_ITEM_LINE_PATTERN.test(nextLine)) {
+    return true
+  }
+
+  const hasSentenceBoundary =
+    SENTENCE_ENDING_LINE_PATTERN.test(previousLine) &&
+    PARAGRAPH_START_LINE_PATTERN.test(nextLine)
+
+  if (!hasSentenceBoundary) {
+    return false
+  }
+
+  if (!isLikelyHardWrappedText) {
+    return true
+  }
+
+  const wrapLikeLineThreshold = Math.max(
+    MIN_WRAP_LENGTH_SAMPLE,
+    estimatedWrapLength - HARD_WRAP_LINE_CLUSTER_TOLERANCE
+  )
+  const linesLookLikeWrappedProse =
+    previousLine.length >= wrapLikeLineThreshold &&
+    nextLine.length >= wrapLikeLineThreshold &&
+    Math.abs(previousLine.length - nextLine.length) <= HARD_WRAP_LINE_CLUSTER_TOLERANCE
+
+  if (linesLookLikeWrappedProse) {
+    return false
+  }
+
+  const shortLineThreshold = Math.max(
+    MIN_WRAP_LENGTH_SAMPLE,
+    Math.floor(estimatedWrapLength * PARAGRAPH_BREAK_SHORT_LINE_RATIO)
+  )
+
+  return previousLine.length < shortLineThreshold || nextLine.length < shortLineThreshold
 }
 
 function createMarkedTokenEntryFromToken(token: ReadingTextToken): MarkedReadingTokenEntry {
@@ -440,6 +590,17 @@ function isReadingHistoryStage(value: unknown): value is Exclude<ReadingStage, '
     value === 'wordStudy' ||
     value === 'batch'
   )
+}
+
+function resolvePersistedReadingHistoryStage(
+  readingStage: ReadingStage,
+  inputResumeStage: ActiveReadingStage | null
+): ActiveReadingStage | null {
+  if (readingStage === 'input') {
+    return inputResumeStage
+  }
+
+  return readingStage
 }
 
 function normalizeHistoryTag(value: unknown): Tag | null {
@@ -996,6 +1157,68 @@ function inferPos(grammar?: string, senseGroup?: string): string {
   return 'definitions 释义'
 }
 
+function buildLookupSensePosGroups(senses: LookupSenseData[]): LookupSensePosGroup[] {
+  const processedSenses = senses.map((sense) => ({
+    ...sense,
+    _inferredPos: inferPos(sense.grammar, sense.sense_group)
+  }))
+
+  let lastSolidPos: string | null = null
+  processedSenses.sort((leftSense, rightSense) => leftSense.id - rightSense.id)
+
+  processedSenses.forEach((sense) => {
+    if (sense._inferredPos !== 'definitions 释义' && sense._inferredPos !== 'idiom 习语') {
+      lastSolidPos = sense._inferredPos
+      return
+    }
+
+    const normalizedGrammar = sense.grammar?.trim()
+    const shouldInheritPreviousPos =
+      sense._inferredPos === 'definitions 释义' &&
+      lastSolidPos &&
+      (
+        normalizedGrammar?.startsWith('(') ||
+        normalizedGrammar?.startsWith('[') ||
+        normalizedGrammar?.toLowerCase().includes('definitions')
+      )
+
+    if (shouldInheritPreviousPos) {
+      sense._inferredPos = lastSolidPos
+    }
+  })
+
+  const sortedSenses = [...processedSenses]
+  sortedSenses.sort((leftSense, rightSense) => {
+    const leftPosIndex = LOOKUP_SENSE_POS_ORDER.indexOf(leftSense._inferredPos as typeof LOOKUP_SENSE_POS_ORDER[number])
+    const rightPosIndex = LOOKUP_SENSE_POS_ORDER.indexOf(rightSense._inferredPos as typeof LOOKUP_SENSE_POS_ORDER[number])
+    const leftOrder = leftPosIndex === -1 ? 999 : leftPosIndex
+    const rightOrder = rightPosIndex === -1 ? 999 : rightPosIndex
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder
+    }
+
+    return leftSense.sense_index - rightSense.sense_index
+  })
+
+  const posGroups: LookupSensePosGroup[] = []
+  let currentGroup: LookupSensePosGroup | null = null
+
+  sortedSenses.forEach((sense) => {
+    if (!currentGroup || currentGroup.posTitle !== sense._inferredPos) {
+      currentGroup = {
+        posTitle: sense._inferredPos,
+        senses: []
+      }
+      posGroups.push(currentGroup)
+    }
+
+    currentGroup.senses.push(sense)
+  })
+
+  return posGroups
+}
+
 function createIdleLookupPanelState(): LookupPanelState {
   return {
     tokenId: '',
@@ -1209,7 +1432,7 @@ function ReadingHistoryDrawer({
   isOpen: boolean
   records: ReadingHistoryRecord[]
   onClose: () => void
-  onResume: (record: ReadingHistoryRecord) => void
+  onResume: (record: ReadingHistoryRecord) => Promise<void> | void
   onDelete: (recordId: string) => Promise<void> | void
 }) {
   useBodyScrollLock(isOpen)
@@ -1229,7 +1452,7 @@ function ReadingHistoryDrawer({
             <div>
               <div className="text-lg font-semibold text-slate-900">阅读历史</div>
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                查看之前的辅助精读记录，可继续阅读或回顾已完成内容。
+                关闭阅读窗口后，会保存到这里，可继续阅读或回顾已完成内容。
               </p>
             </div>
 
@@ -1248,7 +1471,7 @@ function ReadingHistoryDrawer({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {records.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm leading-6 text-slate-400">
-              暂无阅读历史。开始一次阅读后，会自动保存到这里。
+              暂无阅读历史。关闭阅读窗口后，阅读进度会保存到这里。
             </div>
           ) : (
             <div className="space-y-3">
@@ -1280,7 +1503,7 @@ function ReadingHistoryDrawer({
                     <div className="mt-4 flex items-center justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => onResume(record)}
+                        onClick={() => void onResume(record)}
                         className="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-medium text-white transition hover:bg-blue-700"
                       >
                         继续阅读
@@ -1401,6 +1624,8 @@ export default function ReadingApp() {
   const [readingStage, setReadingStage] = useState<ReadingStage>('input')
   const [draftText, setDraftText] = useState('')
   const [committedText, setCommittedText] = useState('')
+  const [inputResumeStage, setInputResumeStage] = useState<ActiveReadingStage | null>(null)
+  const [readingSessionCreatedAt, setReadingSessionCreatedAt] = useState<string | null>(null)
   const [readingDisplayMode, setReadingDisplayMode] = useState<DefinitionDisplayMode>('both')
   const [readingAutoPlay, setReadingAutoPlay] = useState(false)
   const [readingAutoPlayAccent, setReadingAutoPlayAccent] = useState<'uk' | 'us'>('uk')
@@ -1416,9 +1641,17 @@ export default function ReadingApp() {
   const [isBatchTagDialogOpen, setIsBatchTagDialogOpen] = useState(false)
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const [isLookupSearchDropdownOpen, setIsLookupSearchDropdownOpen] = useState(false)
+  const [collapsedLookupSenseGroups, setCollapsedLookupSenseGroups] = useState<Set<string>>(new Set())
+  const [isLookupWordTagSelectorOpen, setIsLookupWordTagSelectorOpen] = useState(false)
+  const [isLookupWordFavoriteSaving, setIsLookupWordFavoriteSaving] = useState(false)
+  const [isLookupWordArchiveSaving, setIsLookupWordArchiveSaving] = useState(false)
+  const [isLookupWordNoteEditing, setIsLookupWordNoteEditing] = useState(false)
+  const [lookupWordNoteDraft, setLookupWordNoteDraft] = useState('')
+  const [isLookupWordNoteSaving, setIsLookupWordNoteSaving] = useState(false)
   const [isGuideDrawerOpen, setIsGuideDrawerOpen] = useState(false)
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false)
   const lookupRequestIdRef = useRef(0)
+  const lookupSearchInputRef = useRef<HTMLInputElement | null>(null)
   const lookupSearchSuggestionsEnabled =
     readingStage === 'reading' && lookupPanelState.normalizedToken !== ''
   const {
@@ -1436,9 +1669,11 @@ export default function ReadingApp() {
   })
 
   const normalizedDraftText = draftText.trim()
-  const canStartReading = normalizedDraftText.length > 0
+  const isInputTextLocked = committedText.trim().length > 0
+  const canStartReading = !isInputTextLocked && normalizedDraftText.length > 0
   const currentFlowStepId = getCurrentFlowStepId(readingStage)
   const hasCommittedReadingText = committedText.trim().length > 0
+  const inputTextValue = isInputTextLocked ? committedText : draftText
   const readingParagraphs = useMemo(
     () => buildReadingParagraphs(committedText),
     [committedText]
@@ -1474,6 +1709,53 @@ export default function ReadingApp() {
     () => resolveLookupRedirectTarget(lookupPanelState.word, lookupPanelState.senses),
     [lookupPanelState.senses, lookupPanelState.word]
   )
+  const lookupSensePosGroups = useMemo(
+    () => buildLookupSensePosGroups(lookupPanelState.senses),
+    [lookupPanelState.senses]
+  )
+  const lookupWordTags = lookupPanelState.word?.tags || []
+  const lookupWordVisibleTags = lookupWordTags.filter(
+    (tag) =>
+      tag.name !== SYSTEM_TAGS.FAVORITE.name &&
+      tag.name !== SYSTEM_TAGS.ARCHIVED.name
+  )
+  const hasLookupWordCustomTag = lookupWordTags.some(
+    (tag) => tag.name !== SYSTEM_TAGS.FAVORITE.name && tag.name !== SYSTEM_TAGS.ARCHIVED.name
+  )
+  const isLookupWordFavorited = lookupWordTags.some((tag) => tag.name === SYSTEM_TAGS.FAVORITE.name)
+  const isLookupWordArchived = lookupWordTags.some((tag) => tag.name === SYSTEM_TAGS.ARCHIVED.name)
+  const hasLookupWordNote = !!lookupPanelState.word?.note?.trim()
+  const isLookupWordNoteActive = hasLookupWordNote || isLookupWordNoteEditing
+
+  const updateLookupWordById = (
+    wordId: number,
+    resolveNextWord: (word: LookupWordData) => LookupWordData
+  ) => {
+    setLookupPanelState((currentState) => {
+      if (!currentState.word || currentState.word.id !== wordId) {
+        return currentState
+      }
+
+      return {
+        ...currentState,
+        word: resolveNextWord(currentState.word)
+      }
+    })
+  }
+
+  const toggleLookupSenseGroup = (groupTitle: string) => {
+    setCollapsedLookupSenseGroups((currentGroups) => {
+      const nextGroups = new Set(currentGroups)
+
+      if (nextGroups.has(groupTitle)) {
+        nextGroups.delete(groupTitle)
+      } else {
+        nextGroups.add(groupTitle)
+      }
+
+      return nextGroups
+    })
+  }
 
   const resetLookupInteractionState = () => {
     lookupRequestIdRef.current += 1
@@ -1481,6 +1763,75 @@ export default function ReadingApp() {
     setLookupSearchInputValue('')
     clearLookupSearchResults()
     setIsLookupSearchDropdownOpen(false)
+    setIsLookupWordTagSelectorOpen(false)
+    setIsLookupWordNoteEditing(false)
+    setLookupWordNoteDraft('')
+  }
+
+  const handleReadingLookupBackgroundClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (lookupPanelState.tokenId === '') {
+      return
+    }
+
+    const rawTarget = event.target
+    const target =
+      rawTarget instanceof HTMLElement
+        ? rawTarget
+        : rawTarget instanceof Node
+          ? rawTarget.parentElement
+          : null
+
+    if (!target) {
+      return
+    }
+
+    if (target.closest('button, input, textarea, a, label')) {
+      return
+    }
+
+    resetLookupInteractionState()
+    lookupSearchInputRef.current?.blur()
+  }
+
+  const clearReadingSessionProgress = () => {
+    setCommittedText('')
+    setReadingSessionId(null)
+    setReadingSessionCreatedAt(null)
+    setInputResumeStage(null)
+    setMarkedTokenEntries([])
+    resetLookupInteractionState()
+    setSelectedSenseEntries([])
+    setShuffledSenseEntries([])
+    setSelectedBatchEntryIds(new Set())
+    setIsBatchTagDialogOpen(false)
+  }
+
+  const persistCurrentReadingHistoryRecord = () => {
+    const persistedReadingStage = resolvePersistedReadingHistoryStage(readingStage, inputResumeStage)
+    if (!readingSessionId || !persistedReadingStage || committedText.trim().length === 0) {
+      return
+    }
+
+    const updatedAt = new Date().toISOString()
+    const nextRecord: ReadingHistoryRecord = {
+      id: readingSessionId,
+      title: createReadingHistoryTitle(committedText),
+      articleText: committedText,
+      readingStage: persistedReadingStage,
+      markedTokenEntries,
+      selectedSenseEntries,
+      shuffledSenseEntries,
+      selectedBatchEntryIds: Array.from(selectedBatchEntryIds),
+      createdAt: readingSessionCreatedAt || updatedAt,
+      updatedAt
+    }
+    const existingRecords = loadReadingHistoryRecords()
+    const nextRecords = [
+      nextRecord,
+      ...existingRecords.filter((record) => record.id !== readingSessionId)
+    ]
+
+    saveReadingHistoryRecords(nextRecords)
   }
 
   useEffect(() => {
@@ -1523,45 +1874,6 @@ export default function ReadingApp() {
   }, [])
 
   useEffect(() => {
-    if (!readingSessionId || readingStage === 'input' || committedText.trim().length === 0) {
-      return
-    }
-
-    const updatedAt = new Date().toISOString()
-
-    setReadingHistoryRecords((currentRecords) => {
-      const existingRecord = currentRecords.find((record) => record.id === readingSessionId)
-      const nextRecord: ReadingHistoryRecord = {
-        id: readingSessionId,
-        title: createReadingHistoryTitle(committedText),
-        articleText: committedText,
-        readingStage,
-        markedTokenEntries,
-        selectedSenseEntries,
-        shuffledSenseEntries,
-        selectedBatchEntryIds: Array.from(selectedBatchEntryIds),
-        createdAt: existingRecord?.createdAt || updatedAt,
-        updatedAt
-      }
-      const nextRecords = [
-        nextRecord,
-        ...currentRecords.filter((record) => record.id !== readingSessionId)
-      ].slice(0, READING_HISTORY_LIMIT)
-
-      saveReadingHistoryRecords(nextRecords)
-      return nextRecords
-    })
-  }, [
-    committedText,
-    markedTokenEntries,
-    readingSessionId,
-    readingStage,
-    selectedBatchEntryIds,
-    selectedSenseEntries,
-    shuffledSenseEntries
-  ])
-
-  useEffect(() => {
     setSelectedBatchEntryIds((currentEntryIds) => {
       const validEntryIds = new Set(selectedSenseEntries.map((entry) => entry.tokenId))
       const nextEntryIds = new Set(
@@ -1575,6 +1887,28 @@ export default function ReadingApp() {
       return nextEntryIds
     })
   }, [selectedSenseEntries])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      persistCurrentReadingHistoryRecord()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [
+    committedText,
+    inputResumeStage,
+    markedTokenEntries,
+    readingSessionCreatedAt,
+    readingSessionId,
+    readingStage,
+    selectedBatchEntryIds,
+    selectedSenseEntries,
+    shuffledSenseEntries
+  ])
 
   const loadLookupByWordId = async (
     wordId: number,
@@ -1601,14 +1935,26 @@ export default function ReadingApp() {
       senses: [],
       selectedSenseId
     })
+    setIsLookupWordTagSelectorOpen(false)
+    setIsLookupWordNoteEditing(false)
+    setLookupWordNoteDraft('')
 
     try {
-      const data = await window.api.getWordSenses(wordId, selectedEntryHeadword)
+      const [data, wordNoteResult] = await Promise.all([
+        window.api.getWordSenses(wordId, selectedEntryHeadword),
+        window.api.getWordNote(wordId).catch((error) => {
+          console.error('Load reading lookup word note failed:', error)
+          return { success: false, note: null }
+        })
+      ])
       if (lookupRequestIdRef.current !== requestId) {
         return
       }
 
-      const lookupWord = data.word as LookupWordData
+      const lookupWord = {
+        ...(data.word as LookupWordData),
+        note: wordNoteResult.success ? wordNoteResult.note || undefined : undefined
+      }
       const lookupSenses = (data.senses || []) as LookupSenseData[]
 
       setLookupPanelState({
@@ -1875,6 +2221,171 @@ export default function ReadingApp() {
     )
   }
 
+  const handleLookupWordFavoriteToggle = async () => {
+    const lookupWord = lookupPanelState.word
+    if (!lookupWord || isLookupWordFavoriteSaving) {
+      return
+    }
+
+    const wordId = lookupWord.id
+    const isWordFavorited = (lookupWord.tags || []).some((tag) => tag.name === SYSTEM_TAGS.FAVORITE.name)
+
+    setIsLookupWordFavoriteSaving(true)
+    try {
+      const allTags = await window.api.getTags()
+      const favoriteTag = allTags.find((tag) => tag.name === SYSTEM_TAGS.FAVORITE.name)
+      if (!favoriteTag) {
+        await alert({ title: '操作失败', message: '收藏标签不存在', type: 'danger' })
+        return
+      }
+
+      if (isWordFavorited) {
+        await window.api.removeEntityTag('word', wordId, favoriteTag.id)
+        updateLookupWordById(wordId, (word) => ({
+          ...word,
+          tags: (word.tags || []).filter((tag) => tag.id !== favoriteTag.id)
+        }))
+      } else {
+        await window.api.addEntityTag('word', wordId, favoriteTag.id)
+        updateLookupWordById(wordId, (word) => {
+          const currentTags = word.tags || []
+          if (currentTags.some((tag) => tag.id === favoriteTag.id)) {
+            return word
+          }
+
+          return {
+            ...word,
+            tags: [...currentTags, favoriteTag]
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Toggle reading lookup word favorite failed:', error)
+      await alert({ title: '操作失败', message: '更新词条收藏失败，请重试', type: 'danger' })
+    } finally {
+      setIsLookupWordFavoriteSaving(false)
+    }
+  }
+
+  const handleLookupWordArchiveToggle = async () => {
+    const lookupWord = lookupPanelState.word
+    if (!lookupWord || isLookupWordArchiveSaving) {
+      return
+    }
+
+    const wordId = lookupWord.id
+    const isWordArchived = (lookupWord.tags || []).some((tag) => tag.name === SYSTEM_TAGS.ARCHIVED.name)
+
+    setIsLookupWordArchiveSaving(true)
+    try {
+      const allTags = await window.api.getTags()
+      const archivedTag = allTags.find((tag) => tag.name === SYSTEM_TAGS.ARCHIVED.name)
+      if (!archivedTag) {
+        await alert({ title: '操作失败', message: '归档标签不存在', type: 'danger' })
+        return
+      }
+
+      if (isWordArchived) {
+        await window.api.removeEntityTag('word', wordId, archivedTag.id)
+        updateLookupWordById(wordId, (word) => ({
+          ...word,
+          tags: (word.tags || []).filter((tag) => tag.id !== archivedTag.id)
+        }))
+      } else {
+        await window.api.addEntityTag('word', wordId, archivedTag.id)
+        updateLookupWordById(wordId, (word) => {
+          const currentTags = word.tags || []
+          if (currentTags.some((tag) => tag.id === archivedTag.id)) {
+            return word
+          }
+
+          return {
+            ...word,
+            tags: [...currentTags, archivedTag]
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Toggle reading lookup word archive failed:', error)
+      await alert({ title: '操作失败', message: '更新词条归档失败，请重试', type: 'danger' })
+    } finally {
+      setIsLookupWordArchiveSaving(false)
+    }
+  }
+
+  const handleLookupWordTagsChange = (wordId: number, nextTags: Tag[]) => {
+    updateLookupWordById(wordId, (word) => ({
+      ...word,
+      tags: nextTags
+    }))
+  }
+
+  const startLookupWordNoteEditing = () => {
+    const lookupWord = lookupPanelState.word
+    if (!lookupWord) {
+      return
+    }
+
+    setLookupWordNoteDraft(lookupWord.note || '')
+    setIsLookupWordNoteEditing(true)
+  }
+
+  const cancelLookupWordNoteEditing = () => {
+    setLookupWordNoteDraft('')
+    setIsLookupWordNoteEditing(false)
+  }
+
+  const saveLookupWordNote = async () => {
+    const lookupWord = lookupPanelState.word
+    if (!lookupWord || isLookupWordNoteSaving) {
+      return
+    }
+
+    const wordId = lookupWord.id
+    const normalizedWordNote = lookupWordNoteDraft.trim()
+
+    setIsLookupWordNoteSaving(true)
+    try {
+      await window.api.saveWordNote(wordId, normalizedWordNote)
+      updateLookupWordById(wordId, (word) => ({
+        ...word,
+        note: normalizedWordNote || undefined
+      }))
+      setIsLookupWordNoteEditing(false)
+      setLookupWordNoteDraft('')
+    } catch (error) {
+      console.error('Save reading lookup word note failed:', error)
+      await alert({ title: '操作失败', message: '保存词条笔记失败，请重试', type: 'danger' })
+    } finally {
+      setIsLookupWordNoteSaving(false)
+    }
+  }
+
+  const deleteLookupWordNote = async () => {
+    const lookupWord = lookupPanelState.word
+    if (!lookupWord || isLookupWordNoteSaving) {
+      return
+    }
+
+    const wordId = lookupWord.id
+
+    setIsLookupWordNoteSaving(true)
+    try {
+      await window.api.deleteWordNote(wordId)
+      updateLookupWordById(wordId, (word) => ({
+        ...word,
+        note: undefined
+      }))
+      setIsLookupWordNoteEditing(false)
+      setLookupWordNoteDraft('')
+    } catch (error) {
+      console.error('Delete reading lookup word note failed:', error)
+      await alert({ title: '操作失败', message: '删除词条笔记失败，请重试', type: 'danger' })
+    } finally {
+      setIsLookupWordNoteSaving(false)
+    }
+  }
+
   const handleLookupSearchInputChange = (nextValue: string) => {
     setLookupSearchInputValue(nextValue)
 
@@ -2043,8 +2554,12 @@ export default function ReadingApp() {
 
     const normalizedArticleText = normalizePastedArticleText(draftText)
     const nextReadingSessionId = createReadingHistoryId()
+    const createdAt = new Date().toISOString()
+    setDraftText(normalizedArticleText)
     setReadingSessionId(nextReadingSessionId)
+    setReadingSessionCreatedAt(createdAt)
     setCommittedText(normalizedArticleText)
+    setInputResumeStage('markWords')
     setMarkedTokenEntries([])
     resetLookupInteractionState()
     setSelectedSenseEntries([])
@@ -2055,14 +2570,35 @@ export default function ReadingApp() {
   }
 
   const handleGoBackToInputStage = () => {
-    setCommittedText('')
-    setReadingSessionId(null)
-    setMarkedTokenEntries([])
-    resetLookupInteractionState()
-    setSelectedSenseEntries([])
-    setShuffledSenseEntries([])
-    setSelectedBatchEntryIds(new Set())
-    setIsBatchTagDialogOpen(false)
+    if (readingStage !== 'input') {
+      setInputResumeStage(readingStage)
+    }
+    setReadingStage('input')
+  }
+
+  const handleContinueLockedInput = () => {
+    setReadingStage(inputResumeStage || 'markWords')
+  }
+
+  const handleUnlockInputForRestart = async () => {
+    if (!isInputTextLocked) {
+      return
+    }
+
+    const shouldRestart = await confirm({
+      title: '重新输入文本',
+      message: '重新输入会清空当前阅读进度，包括已标记单词和已选释义。确认继续？',
+      confirmText: '重新输入',
+      cancelText: '取消',
+      type: 'danger'
+    })
+
+    if (!shouldRestart) {
+      return
+    }
+
+    setDraftText(committedText)
+    clearReadingSessionProgress()
     setReadingStage('input')
   }
 
@@ -2120,6 +2656,9 @@ export default function ReadingApp() {
     }
 
     if (stepId === 'input') {
+      if (readingStage !== 'input') {
+        setInputResumeStage(readingStage)
+      }
       setReadingStage('input')
       return
     }
@@ -2160,11 +2699,33 @@ export default function ReadingApp() {
     setIsHistoryDrawerOpen(true)
   }
 
-  const handleResumeReadingHistoryRecord = (record: ReadingHistoryRecord) => {
+  const handleResumeReadingHistoryRecord = async (record: ReadingHistoryRecord) => {
+    const isSwitchingUnsavedSession =
+      readingSessionId !== null &&
+      readingSessionId !== record.id &&
+      committedText.trim().length > 0 &&
+      resolvePersistedReadingHistoryStage(readingStage, inputResumeStage) !== null
+
+    if (isSwitchingUnsavedSession) {
+      const shouldSwitch = await confirm({
+        title: '切换阅读记录',
+        message: '当前阅读进度只有关闭窗口时才会保存到历史记录。现在切换会丢失这次未关闭的进度，确认继续？',
+        confirmText: '继续切换',
+        cancelText: '取消',
+        type: 'warning'
+      })
+
+      if (!shouldSwitch) {
+        return
+      }
+    }
+
     const validSelectedEntryIds = new Set(record.selectedSenseEntries.map((entry) => entry.tokenId))
     setReadingSessionId(record.id)
+    setReadingSessionCreatedAt(record.createdAt)
     setDraftText(record.articleText)
     setCommittedText(record.articleText)
+    setInputResumeStage(record.readingStage)
     setMarkedTokenEntries(record.markedTokenEntries)
     setSelectedSenseEntries(record.selectedSenseEntries)
     setShuffledSenseEntries(
@@ -2202,6 +2763,7 @@ export default function ReadingApp() {
 
     if (recordId === readingSessionId) {
       setReadingSessionId(null)
+      setReadingSessionCreatedAt(null)
     }
   }
 
@@ -2517,7 +3079,10 @@ export default function ReadingApp() {
                 <h2 className="text-sm font-semibold text-slate-900">阅读原文</h2>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-4 xl:px-8">
+              <div
+                className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-4 xl:px-8"
+                onClick={handleReadingLookupBackgroundClick}
+              >
                 <div className="space-y-6 text-lg leading-9 text-slate-700">
                   {readingParagraphs.map((paragraph) => (
                     <p key={paragraph.id} className="whitespace-pre-wrap">
@@ -2541,7 +3106,7 @@ export default function ReadingApp() {
                                 : isSelectedToken
                                   ? 'bg-blue-50 text-blue-700'
                                   : isMarkedToken
-                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    ? 'bg-slate-200 text-slate-800 hover:bg-slate-300'
                                     : 'text-slate-700 hover:bg-slate-100'
                             }`}
                           >
@@ -2555,13 +3120,14 @@ export default function ReadingApp() {
               </div>
             </section>
 
-            <aside className="flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white shadow-sm lg:h-full lg:overflow-hidden">
+            <aside className="flex min-h-0 min-w-0 flex-col rounded-3xl border border-slate-200 bg-white shadow-sm lg:h-full lg:overflow-hidden">
               <div className="px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">释义选择</h2>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="shrink-0 text-xs leading-5 text-slate-500">当前词：</span>
                   <div className="relative min-w-0 flex-1">
                     <input
+                      ref={lookupSearchInputRef}
                       type="text"
                       value={lookupSearchInputValue}
                       onChange={(event) => handleLookupSearchInputChange(event.target.value)}
@@ -2609,19 +3175,194 @@ export default function ReadingApp() {
                 </div>
 
                 {lookupPanelState.word && (
-                  <WordPronunciation
-                    headword={lookupPanelState.word.headword}
-                    phonUk={lookupPanelState.word.phon_uk}
-                    phonUs={lookupPanelState.word.phon_us}
-                    autoPlay={readingAutoPlay}
-                    autoPlayAccent={readingAutoPlayAccent}
-                    size="compact"
-                    className="mt-3"
-                  />
+                  <>
+                    <WordPronunciation
+                      headword={lookupPanelState.word.headword}
+                      phonUk={lookupPanelState.word.phon_uk}
+                      phonUs={lookupPanelState.word.phon_us}
+                      autoPlay={readingAutoPlay}
+                      autoPlayAccent={readingAutoPlayAccent}
+                      size="compact"
+                      className="mt-3"
+                    />
+
+                    {!lookupRedirectTarget && (
+                      <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                              {lookupWordVisibleTags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"
+                                >
+                                  <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                  </svg>
+                                  <span className="truncate">{tag.name}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void handleLookupWordFavoriteToggle()}
+                              disabled={isLookupWordFavoriteSaving}
+                              className={`favorite-btn ${
+                                isLookupWordFavorited ? 'active' : 'text-gray-300'
+                              } ${isLookupWordFavoriteSaving ? 'cursor-not-allowed opacity-60' : ''}`}
+                              title={isLookupWordFavorited ? '取消收藏' : '收藏'}
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                />
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsLookupWordTagSelectorOpen(true)}
+                              className={`favorite-btn ${
+                                hasLookupWordCustomTag
+                                  ? 'is-tag-active'
+                                  : 'text-gray-300'
+                              }`}
+                              title="管理标签"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void handleLookupWordArchiveToggle()}
+                              disabled={isLookupWordArchiveSaving}
+                              className={`favorite-btn ${
+                                isLookupWordArchived
+                                  ? 'is-archive-active'
+                                  : 'text-gray-300'
+                              } ${isLookupWordArchiveSaving ? 'cursor-not-allowed opacity-60' : ''}`}
+                              title={isLookupWordArchived ? '取消归档' : '归档'}
+                            >
+                              <ArchiveIcon className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={isLookupWordNoteEditing ? cancelLookupWordNoteEditing : startLookupWordNoteEditing}
+                              className={`favorite-btn ${
+                                isLookupWordNoteActive
+                                  ? 'is-note-active'
+                                  : 'text-gray-300'
+                              }`}
+                              title="添加/编辑笔记"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        {(isLookupWordNoteEditing || hasLookupWordNote) && (
+                          <div className="mt-3 text-sm">
+                            {isLookupWordNoteEditing ? (
+                              <div className="rounded border border-yellow-200 bg-yellow-50 p-2">
+                                <textarea
+                                  className="min-h-[72px] w-full resize-none bg-transparent text-slate-700 outline-none"
+                                  value={lookupWordNoteDraft}
+                                  onChange={(event) => setLookupWordNoteDraft(event.target.value)}
+                                  placeholder="添加词条笔记..."
+                                  autoFocus
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && !event.shiftKey) {
+                                      event.preventDefault()
+                                      void saveLookupWordNote()
+                                    }
+                                  }}
+                                />
+                                <div className="mt-2 flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteLookupWordNote()}
+                                    disabled={isLookupWordNoteSaving || !hasLookupWordNote}
+                                    className={`px-2 py-1 text-xs ${
+                                      isLookupWordNoteSaving || !hasLookupWordNote
+                                        ? 'cursor-not-allowed text-gray-300'
+                                        : 'text-red-500 hover:text-red-700'
+                                    }`}
+                                  >
+                                    删除
+                                  </button>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={cancelLookupWordNoteEditing}
+                                      className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                                    >
+                                      取消
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void saveLookupWordNote()}
+                                      disabled={isLookupWordNoteSaving}
+                                      className={`rounded px-3 py-1 text-xs ${
+                                        isLookupWordNoteSaving
+                                          ? 'cursor-not-allowed bg-yellow-100 text-yellow-300'
+                                          : 'bg-yellow-200 text-yellow-800 hover:bg-yellow-300'
+                                      }`}
+                                    >
+                                      保存
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="group relative rounded-r border-l-2 border-yellow-400 bg-yellow-50/60 py-2 pl-3 pr-7 text-gray-600">
+                                <p className="whitespace-pre-wrap break-words">{lookupPanelState.word.note}</p>
+                                <button
+                                  type="button"
+                                  onClick={startLookupWordNoteEditing}
+                                  className="absolute right-1.5 top-1.5 rounded p-0.5 text-gray-400 opacity-0 transition-all hover:bg-yellow-100 hover:text-yellow-600 group-hover:opacity-100"
+                                  title="编辑笔记"
+                                >
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-4">
                 {lookupPanelState.status === 'idle' && (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm leading-6 text-slate-400">
                     点击已标记的单词后，将在这里显示可选释义。
@@ -2665,51 +3406,101 @@ export default function ReadingApp() {
                 {lookupPanelState.status === 'ready' &&
                   lookupPanelState.word &&
                   !lookupRedirectTarget && (
-                    <div className="space-y-4">
-                      {lookupPanelState.senses.map((sense) => {
-                        const isSelectedSense = lookupPanelState.selectedSenseId === sense.id
-                        const selectionLabel =
-                          lookupPanelState.selectedSenseId === null
-                            ? '选为本文义项'
-                            : isSelectedSense
-                              ? '取消本文义项'
-                              : '改选为本文义项'
+                    <div className="min-w-0 space-y-5">
+                      {lookupSensePosGroups.map((group) => {
+                        const isCollapsed = collapsedLookupSenseGroups.has(group.posTitle)
+                        const shouldShowGroupHeader =
+                          lookupSensePosGroups.length > 1 || group.posTitle !== 'definitions 释义'
 
                         return (
-                          <div
-                            key={sense.id}
-                            className={`rounded-[1.75rem] border p-2 transition ${
-                              isSelectedSense ? 'border-blue-300 bg-blue-50/50' : 'border-transparent'
-                            }`}
-                          >
-                            <SenseCard
-                              sense={sense}
-                              headword={lookupPanelState.word!.headword}
-                              pos={inferPos(sense.grammar, sense.sense_group)}
-                              onFavoriteToggle={() =>
-                                void handleLookupSenseFavoriteToggle(sense.id, sense.is_favorited === 1)
-                              }
-                              displayMode={readingDisplayMode}
-                              size="compact"
-                            />
-
-                            <div className="px-3 pb-2 pt-1">
+                          <div key={group.posTitle} className="min-w-0 space-y-3">
+                            {shouldShowGroupHeader && (
                               <button
                                 type="button"
-                                onClick={() =>
-                                  isSelectedSense
-                                    ? handleClearReadingSenseSelection()
-                                    : handleSelectReadingSense(sense)
-                                }
-                                className={`w-full rounded-xl px-4 py-2 text-xs font-medium transition ${
-                                  isSelectedSense
-                                    ? 'bg-blue-600 text-white'
-                                    : 'border border-blue-200 bg-white text-blue-700 hover:bg-blue-50'
+                                onClick={() => toggleLookupSenseGroup(group.posTitle)}
+                                className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold shadow-sm transition ${
+                                  isCollapsed
+                                    ? 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
+                                    : 'border-blue-300 bg-blue-50 text-blue-700 ring-1 ring-blue-100'
                                 }`}
                               >
-                                {selectionLabel}
+                                <span
+                                  className={`h-2 w-2 shrink-0 rounded-full ${
+                                    isCollapsed ? 'bg-slate-300' : 'bg-blue-500'
+                                  }`}
+                                />
+                                <span className="min-w-0 flex-1 truncate">{group.posTitle}</span>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                    isCollapsed ? 'bg-slate-100 text-slate-400' : 'bg-white text-blue-600'
+                                  }`}
+                                >
+                                  {group.senses.length}
+                                </span>
+                                <svg
+                                  className={`h-4 w-4 shrink-0 transition-transform ${
+                                    isCollapsed ? 'rotate-0' : 'rotate-90'
+                                  } ${isCollapsed ? 'text-slate-400' : 'text-blue-500'}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
                               </button>
-                            </div>
+                            )}
+
+                            {!isCollapsed && (
+                              <div className="min-w-0 space-y-4">
+                                {group.senses.map((sense) => {
+                                  const isSelectedSense = lookupPanelState.selectedSenseId === sense.id
+                                  const selectionLabel =
+                                    lookupPanelState.selectedSenseId === null
+                                      ? '选为本文义项'
+                                      : isSelectedSense
+                                        ? '取消本文义项'
+                                        : '改选为本文义项'
+
+                                  return (
+                                    <div
+                                      key={sense.id}
+                                      className={`min-w-0 rounded-[1.75rem] border p-2 transition ${
+                                        isSelectedSense ? 'border-blue-300 bg-blue-50/50' : 'border-transparent'
+                                      }`}
+                                    >
+                                      <SenseCard
+                                        sense={sense}
+                                        headword={lookupPanelState.word!.headword}
+                                        pos={inferPos(sense.grammar, sense.sense_group)}
+                                        onFavoriteToggle={() =>
+                                          void handleLookupSenseFavoriteToggle(sense.id, sense.is_favorited === 1)
+                                        }
+                                        displayMode={readingDisplayMode}
+                                        size="compact"
+                                      />
+
+                                      <div className="px-3 pb-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            isSelectedSense
+                                              ? handleClearReadingSenseSelection()
+                                              : handleSelectReadingSense(sense)
+                                          }
+                                          className={`w-full rounded-xl px-4 py-2 text-xs font-medium transition ${
+                                            isSelectedSense
+                                              ? 'bg-blue-600 text-white'
+                                              : 'border border-blue-200 bg-white text-blue-700 hover:bg-blue-50'
+                                          }`}
+                                        >
+                                          {selectionLabel}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -2718,6 +3509,15 @@ export default function ReadingApp() {
               </div>
             </aside>
           </div>
+
+          {isLookupWordTagSelectorOpen && lookupPanelState.word && (
+            <TagSelector
+              wordId={lookupPanelState.word.id}
+              selectedTags={lookupPanelState.word.tags || []}
+              onTagsChange={(nextTags) => handleLookupWordTagsChange(lookupPanelState.word!.id, nextTags)}
+              onClose={() => setIsLookupWordTagSelectorOpen(false)}
+            />
+          )}
 
           <div className="flex items-center justify-between gap-3">
             <button
@@ -3160,21 +3960,46 @@ export default function ReadingApp() {
 
         <div className="mx-auto w-full max-w-5xl rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <textarea
-            value={draftText}
-            onChange={(event) => setDraftText(event.target.value)}
+            value={inputTextValue}
+            onChange={(event) => {
+              if (!isInputTextLocked) {
+                setDraftText(event.target.value)
+              }
+            }}
+            readOnly={isInputTextLocked}
             rows={READING_TEXTAREA_ROWS}
             placeholder="请输入或粘贴要阅读的英文原文"
-            className="min-h-[28rem] w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-base leading-7 text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+            className={`min-h-[28rem] w-full resize-none rounded-2xl border px-5 py-4 text-base leading-7 text-slate-700 outline-none transition ${
+              isInputTextLocked
+                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
+                : 'border-slate-200 bg-slate-50 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50'
+            }`}
           />
 
-          <div className="mt-5 flex justify-end">
+          <div className="mt-4 text-sm leading-6 text-slate-500">
+            {isInputTextLocked
+              ? '当前文本已锁定，只读展示，避免改动后破坏后续标记与选义进度。'
+              : '输入或粘贴英文原文后开始阅读。'}
+          </div>
+
+          <div className="mt-5 flex justify-end gap-3">
+            {isInputTextLocked && (
+              <button
+                type="button"
+                onClick={() => void handleUnlockInputForRestart()}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                重新输入
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleStartReading}
-              disabled={!canStartReading}
+              onClick={isInputTextLocked ? handleContinueLockedInput : handleStartReading}
+              disabled={!isInputTextLocked && !canStartReading}
               className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
             >
-              开始阅读
+              {isInputTextLocked ? '返回当前进度' : '开始阅读'}
             </button>
           </div>
         </div>

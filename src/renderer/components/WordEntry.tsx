@@ -781,7 +781,7 @@ function WordEntry({
                   >
                     <svg
                       className="w-4 h-4"
-                      fill={isWordFavorited ? 'currentColor' : 'none'}
+                      fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
@@ -799,13 +799,13 @@ function WordEntry({
                   <button
                     onClick={() => setShowTagSelector(true)}
                     className={`favorite-btn ${
-                      hasCustomWordTag ? 'text-indigo-500 bg-indigo-50' : 'text-gray-300'
+                      hasCustomWordTag ? 'is-tag-active' : 'text-gray-300'
                     }`}
                     title="管理标签"
                   >
                     <svg
                       className="w-4 h-4"
-                      fill={hasCustomWordTag ? 'currentColor' : 'none'}
+                      fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
@@ -818,7 +818,7 @@ function WordEntry({
                   <button
                     onClick={handleWordArchiveToggle}
                     className={`favorite-btn ${
-                      isWordArchived ? 'text-gray-600 bg-gray-200' : 'text-gray-300'
+                      isWordArchived ? 'is-archive-active' : 'text-gray-300'
                     } ${isWordArchiveSaving ? 'opacity-60' : ''}`}
                     title={isWordArchived ? '取消归档' : '归档'}
                   >
@@ -829,12 +829,14 @@ function WordEntry({
                 {!readonly && (
                   <button
                     onClick={() => (isWordNoteEditing ? cancelWordNoteEditing() : startWordNoteEditing())}
-                    className={`favorite-btn ${isWordNoteActive ? 'text-yellow-600 bg-yellow-100' : 'text-gray-300'}`}
+                    className={`favorite-btn ${
+                      isWordNoteActive ? 'is-note-active' : 'text-gray-300'
+                    }`}
                     title="添加/编辑笔记"
                   >
                     <svg
                       className="w-4 h-4"
-                      fill={isWordNoteActive ? 'currentColor' : 'none'}
+                      fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >

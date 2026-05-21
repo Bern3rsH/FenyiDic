@@ -72,7 +72,7 @@ export default function OverflowActionMenu({
           event.stopPropagation()
           setIsOpen((currentState) => !currentState)
         }}
-        className={`favorite-btn ${isOpen ? 'bg-gray-100 text-gray-500' : 'text-gray-300'}`}
+        className={`favorite-btn ${isOpen ? 'is-menu-active' : 'text-gray-300'}`}
         title={buttonTitle}
         aria-label={buttonTitle}
         aria-expanded={isOpen}

@@ -612,11 +612,11 @@ function SenseCard({
 
   return (
     <div 
-      className={`sense-card h-full flex flex-col ${isIdiom ? 'sense-card-idiom' : ''} relative`}
+      className={`sense-card relative flex h-full min-w-0 max-w-full flex-col ${isIdiom ? 'sense-card-idiom' : ''}`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {/* 单词和词性放在同一行 - 较小显示 */}
               {/* 单词原文：仅在 showHeadword 为 true 时显示（如收藏页），独立一行 */}
@@ -634,7 +634,7 @@ function SenseCard({
               )}
 
               {/* 词性和语法 */}
-              <div className="flex items-baseline gap-2 mb-1.5">
+              <div className="mb-1.5 flex min-w-0 items-baseline gap-2">
                 {/* 在收藏页显示词性（英文部分），除非 hidePos 为 true */}
                 {showPos && (
                   <span className={`${isCompact ? 'text-[11px]' : 'text-xs'} text-gray-400 italic`}>
@@ -814,7 +814,7 @@ function SenseCard({
           {examples.length > 0 && (
             <>
               {(showExamples || (maxExamples && maxExamples > 0)) && (
-                <div className="examples">
+                <div className="examples min-w-0 max-w-full">
                   {/* 计算显示的例句 */}
                   {(() => {
                     const displayList = (showExamples || !maxExamples) 
@@ -826,13 +826,13 @@ function SenseCard({
                       const hasChineseExample = typeof ex.cn === 'string' && ex.cn.trim() !== ''
 
                       return (
-                        <div key={i} className="example-item group/ex">
+                        <div key={i} className="example-item group/ex min-w-0 max-w-full">
                           {hasEnglishExample && (
-                            <div className="flex items-start gap-2">
-                              <p className="example flex-1" dangerouslySetInnerHTML={{ __html: ex.en }} />
+                            <div className="flex min-w-0 items-start gap-2">
+                              <p className="example min-w-0 flex-1" dangerouslySetInnerHTML={{ __html: ex.en }} />
                               <button
                                 onClick={() => speakText(ex.en)}
-                                className="opacity-0 group-hover/ex:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-blue-500"
+                                className="shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-blue-500 group-hover/ex:opacity-100"
                                 title="朗读例句"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -851,9 +851,9 @@ function SenseCard({
                   {!showExamples && maxExamples && examples.length > maxExamples && (
                     <button 
                       onClick={() => setShowExamples(true)}
-                      className="text-xs text-blue-500 hover:text-blue-600 mt-2 flex items-center gap-1"
+                      className="mt-2 flex max-w-full items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
                     >
-                      <span>展开更多例句 ({examples.length - maxExamples})</span>
+                      <span className="min-w-0 truncate">展开更多例句 ({examples.length - maxExamples})</span>
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -874,7 +874,7 @@ function SenseCard({
               className={`favorite-btn ${isFavorited ? 'active' : 'text-gray-300'}`}
               title={isFavorited ? '取消收藏' : '收藏'}
             >
-              <svg className="w-4 h-4" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -887,12 +887,14 @@ function SenseCard({
             {/* 标签按钮 */}
             <button
               onClick={() => setShowTagSelector(true)}
-              className={`favorite-btn ${hasCustomTag ? 'text-indigo-500 bg-indigo-50' : 'text-gray-300'}`}
+              className={`favorite-btn ${
+                hasCustomTag ? 'is-tag-active' : 'text-gray-300'
+              }`}
               title="管理标签"
             >
               <svg
                 className="w-4 h-4"
-                fill={hasCustomTag ? 'currentColor' : 'none'}
+                fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -905,7 +907,7 @@ function SenseCard({
               onClick={handleArchiveToggle}
               disabled={isArchiveSaving}
               className={`favorite-btn ${
-                isArchived ? 'text-gray-600 bg-gray-200' : 'text-gray-300'
+                isArchived ? 'is-archive-active' : 'text-gray-300'
               } ${isArchiveSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
               title={isArchived ? '取消归档' : '归档'}
             >
@@ -915,12 +917,14 @@ function SenseCard({
             {/* 笔记按钮 */}
             <button
               onClick={isEditing ? () => setIsEditing(false) : startEditing}
-              className={`favorite-btn ${isNoteActive ? 'text-yellow-600 bg-yellow-100' : 'text-gray-300'}`}
+              className={`favorite-btn ${
+                isNoteActive ? 'is-note-active' : 'text-gray-300'
+              }`}
               title="添加/编辑笔记"
             >
               <svg 
                 className="w-4 h-4" 
-                fill={isNoteActive ? "currentColor" : "none"} 
+                fill="none"
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
               >
@@ -931,7 +935,9 @@ function SenseCard({
             {examples.length > 0 && (
               <button
                 onClick={() => setShowExamples(!showExamples)}
-                className={`favorite-btn ${showExamples ? 'text-blue-500 bg-blue-50' : 'text-gray-300'}`}
+                className={`favorite-btn ${
+                  showExamples ? 'is-example-active' : 'text-gray-300'
+                }`}
                 title="查看例句"
               >
                 <svg 

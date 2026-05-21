@@ -116,6 +116,32 @@ function extractDirectRedirectLookupHeadword(rawHtml: string | null | undefined)
   return redirectLookupHeadword || null
 }
 
+function resolveSearchRedirectLookupHeadword(
+  lookupHeadword: string,
+  rawHtml: string | null | undefined,
+  query: string
+): { redirectLookupHeadword: string | null; shouldHidePlaceholder: boolean } {
+  const redirectLookupHeadword = extractDirectRedirectLookupHeadword(rawHtml)
+  if (!redirectLookupHeadword || redirectLookupHeadword === lookupHeadword) {
+    return {
+      redirectLookupHeadword: null,
+      shouldHidePlaceholder: false
+    }
+  }
+
+  if (!isExactHeadwordMatchIgnoreCase(lookupHeadword, query.toLowerCase())) {
+    return {
+      redirectLookupHeadword: null,
+      shouldHidePlaceholder: true
+    }
+  }
+
+  return {
+    redirectLookupHeadword,
+    shouldHidePlaceholder: false
+  }
+}
+
 function extractDisplayHeadwordFromHtml(rawHtml: string | null | undefined, fallbackHeadword: string): string {
   if (!rawHtml) {
     return fallbackHeadword
@@ -819,13 +845,26 @@ export function registerIpcHandlers(): void {
       definition_html: string
       dict_name: string
     }) => {
-      if (!isExactHeadwordMatchIgnoreCase(result.lookup_headword, normalizedQuery.toLowerCase())) {
-        return { resolvedResult: result, redirectLookupHeadword: null }
+      const { redirectLookupHeadword, shouldHidePlaceholder } = resolveSearchRedirectLookupHeadword(
+        result.lookup_headword,
+        result.definition_html,
+        normalizedQuery
+      )
+
+      if (shouldHidePlaceholder) {
+        return {
+          resolvedResult: result,
+          redirectLookupHeadword: null,
+          shouldSkipResult: true
+        }
       }
 
-      const redirectLookupHeadword = extractDirectRedirectLookupHeadword(result.definition_html)
-      if (!redirectLookupHeadword || redirectLookupHeadword === result.lookup_headword) {
-        return { resolvedResult: result, redirectLookupHeadword: null }
+      if (!redirectLookupHeadword) {
+        return {
+          resolvedResult: result,
+          redirectLookupHeadword: null,
+          shouldSkipResult: false
+        }
       }
 
       const resolvedResult = (
@@ -839,7 +878,11 @@ export function registerIpcHandlers(): void {
           | undefined
       ) || result
 
-      return { resolvedResult, redirectLookupHeadword }
+      return {
+        resolvedResult,
+        redirectLookupHeadword,
+        shouldSkipResult: false
+      }
     }
 
     const flattenedSearchResults = searchResults.flatMap((result) => {
@@ -854,7 +897,13 @@ export function registerIpcHandlers(): void {
         ]
       }
 
-      const { resolvedResult, redirectLookupHeadword } = resolveDictionarySearchResult(result)
+      const { resolvedResult, redirectLookupHeadword, shouldSkipResult } =
+        resolveDictionarySearchResult(result)
+
+      if (shouldSkipResult) {
+        return []
+      }
+
       const variantMatchQuery = redirectLookupHeadword || normalizedQuery
 
       return extractDictionaryEntryVariants(resolvedResult.definition_html, resolvedResult.lookup_headword)
