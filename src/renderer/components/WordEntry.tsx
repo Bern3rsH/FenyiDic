@@ -209,6 +209,7 @@ function inferPos(grammar?: string, senseGroup?: string): string {
   if (g.includes('[c]') || g.includes('[u]') || g.includes('noun') || g.includes('plural') || g.includes('sing') || g.includes('countable') || g.includes('uncountable')) return 'noun 名词'
   if (g.includes('[t]') || g.includes('[i]') || g.includes('verb') || g.includes('transitive') || g.includes('intransitive')) return 'verb 动词'
   if (g.includes('prep') || g === 'preposition') return 'preposition 介词'
+  if (g.includes('abbr') || g === 'abbreviation') return 'abbreviation 缩写'
   if (g.includes('pron') || g === 'pronoun') return 'pronoun 代词'
   if (g.includes('conj') || g === 'conjunction') return 'conjunction 连词'
   if (g.includes('interj') || g === 'exclamation') return 'exclamation 感叹词'
@@ -689,7 +690,7 @@ function WordEntry({
 
    // 排序
    const sortedSenses = [...processedSenses]
-   const POS_ORDER = ['noun 名词', 'verb 动词', 'adjective 形容词', 'adverb 副词', 'preposition 介词', 'definitions 释义', 'idiom 习语']
+   const POS_ORDER = ['noun 名词', 'verb 动词', 'adjective 形容词', 'adverb 副词', 'preposition 介词', 'abbreviation 缩写', 'definitions 释义', 'idiom 习语']
    
    sortedSenses.sort((a, b) => {
      const posA = a._inferredPos
@@ -777,7 +778,8 @@ function WordEntry({
                     className={`favorite-btn ${
                       isWordFavorited ? 'active' : 'text-gray-300'
                     } ${isWordFavoriteSaving ? 'opacity-60' : ''}`}
-                    title={isWordFavorited ? '取消收藏' : '收藏'}
+                    data-action-tooltip={isWordFavorited ? '取消收藏' : '收藏'}
+                    aria-label={isWordFavorited ? '取消收藏' : '收藏'}
                   >
                     <svg
                       className="w-4 h-4"
@@ -801,7 +803,8 @@ function WordEntry({
                     className={`favorite-btn ${
                       hasCustomWordTag ? 'is-tag-active' : 'text-gray-300'
                     }`}
-                    title="管理标签"
+                    data-action-tooltip="管理标签"
+                    aria-label="管理标签"
                   >
                     <svg
                       className="w-4 h-4"
@@ -820,7 +823,8 @@ function WordEntry({
                     className={`favorite-btn ${
                       isWordArchived ? 'is-archive-active' : 'text-gray-300'
                     } ${isWordArchiveSaving ? 'opacity-60' : ''}`}
-                    title={isWordArchived ? '取消归档' : '归档'}
+                    data-action-tooltip={isWordArchived ? '取消归档' : '归档'}
+                    aria-label={isWordArchived ? '取消归档' : '归档'}
                   >
                     <ArchiveIcon className="w-4 h-4" />
                   </button>
@@ -832,7 +836,8 @@ function WordEntry({
                     className={`favorite-btn ${
                       isWordNoteActive ? 'is-note-active' : 'text-gray-300'
                     }`}
-                    title="添加/编辑笔记"
+                    data-action-tooltip="添加/编辑笔记"
+                    aria-label="添加/编辑笔记"
                   >
                     <svg
                       className="w-4 h-4"
@@ -915,8 +920,9 @@ function WordEntry({
               {!readonly && (
                 <button
                   onClick={startWordNoteEditing}
-                  className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-yellow-100 transition-all"
-                  title="编辑笔记"
+                  className="action-tooltip-trigger absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-yellow-100 transition-all"
+                  data-action-tooltip="编辑笔记"
+                  aria-label="编辑笔记"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

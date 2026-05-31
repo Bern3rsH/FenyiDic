@@ -758,9 +758,7 @@ function SenseCard({
                   </div>
                 </div>
               ) : (
-                <div 
-                  className="group relative text-gray-600 pl-3 py-1 pr-6 border-l-2 border-yellow-400 bg-yellow-50/50"
-                >
+                <div className="text-gray-600 pl-3 py-1 border-l-2 border-yellow-400 bg-yellow-50/50">
                   <p className="whitespace-pre-wrap">
                     {(() => {
                       if (!headword) return note
@@ -775,36 +773,6 @@ function SenseCard({
                       }
                     })()}
                   </p>
-                  
-                  {/* 快速删除按钮 */}
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                        const isConfirmed = await confirm({
-                          title: '删除笔记',
-                          message: '确定要删除这条笔记吗？',
-                          confirmText: '删除',
-                          type: 'danger'
-                        })
-                      
-                      if (isConfirmed) {
-                        console.log('[SenseCard] Deleting note for sense.id:', sense.id, 'sense:', sense)
-                        setNote('')
-                        try {
-                          await window.api.deleteNote(sense.id)
-                          onNoteChange?.(sense.id, null)
-                        } catch(err) {
-                          console.error(err)
-                        }
-                      }
-                    }}
-                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                    title="删除笔记"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
               )}
             </div>
@@ -832,8 +800,9 @@ function SenseCard({
                               <p className="example min-w-0 flex-1" dangerouslySetInnerHTML={{ __html: ex.en }} />
                               <button
                                 onClick={() => speakText(ex.en)}
-                                className="shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-blue-500 group-hover/ex:opacity-100"
-                                title="朗读例句"
+                                className="action-tooltip-trigger shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-blue-500 group-hover/ex:opacity-100"
+                                data-action-tooltip="朗读例句"
+                                aria-label="朗读例句"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -872,7 +841,8 @@ function SenseCard({
             <button
               onClick={onFavoriteToggle}
               className={`favorite-btn ${isFavorited ? 'active' : 'text-gray-300'}`}
-              title={isFavorited ? '取消收藏' : '收藏'}
+              data-action-tooltip={isFavorited ? '取消收藏' : '收藏'}
+              aria-label={isFavorited ? '取消收藏' : '收藏'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -890,7 +860,8 @@ function SenseCard({
               className={`favorite-btn ${
                 hasCustomTag ? 'is-tag-active' : 'text-gray-300'
               }`}
-              title="管理标签"
+              data-action-tooltip="管理标签"
+              aria-label="管理标签"
             >
               <svg
                 className="w-4 h-4"
@@ -909,7 +880,8 @@ function SenseCard({
               className={`favorite-btn ${
                 isArchived ? 'is-archive-active' : 'text-gray-300'
               } ${isArchiveSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
-              title={isArchived ? '取消归档' : '归档'}
+              data-action-tooltip={isArchived ? '取消归档' : '归档'}
+              aria-label={isArchived ? '取消归档' : '归档'}
             >
               <ArchiveIcon className="w-4 h-4" />
             </button>
@@ -920,7 +892,8 @@ function SenseCard({
               className={`favorite-btn ${
                 isNoteActive ? 'is-note-active' : 'text-gray-300'
               }`}
-              title="添加/编辑笔记"
+              data-action-tooltip="添加/编辑笔记"
+              aria-label="添加/编辑笔记"
             >
               <svg 
                 className="w-4 h-4" 
@@ -938,7 +911,8 @@ function SenseCard({
                 className={`favorite-btn ${
                   showExamples ? 'is-example-active' : 'text-gray-300'
                 }`}
-                title="查看例句"
+                data-action-tooltip="查看例句"
+                aria-label="查看例句"
               >
                 <svg 
                   className={`w-4 h-4 transition-transform duration-200 ${showExamples ? 'rotate-90' : ''}`} 

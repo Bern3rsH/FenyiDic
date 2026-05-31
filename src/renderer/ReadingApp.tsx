@@ -148,6 +148,7 @@ interface ReadingGuideSection {
 const READING_TEXTAREA_ROWS = 18
 const READING_LOOKUP_SUGGESTION_LIMIT = 10
 const READING_LOOKUP_SEARCH_DEBOUNCE_MS = 150
+const READING_LOOKUP_AUDIO_VARIANT_LIMIT = 10
 const READING_BATCH_TAG_COLOR = '#6B7280'
 const LEGACY_READING_HISTORY_STORAGE_KEY = 'reading_history_records'
 const READING_HISTORY_STORAGE_KEY = 'reading_history_records_v2'
@@ -176,6 +177,7 @@ const LOOKUP_SENSE_POS_ORDER = [
   'adjective 形容词',
   'adverb 副词',
   'preposition 介词',
+  'abbreviation 缩写',
   'definitions 释义',
   'idiom 习语'
 ] as const
@@ -1147,6 +1149,7 @@ function inferPos(grammar?: string, senseGroup?: string): string {
     return 'verb 动词'
   }
   if (normalizedGrammar.includes('prep') || normalizedGrammar === 'preposition') return 'preposition 介词'
+  if (normalizedGrammar.includes('abbr') || normalizedGrammar === 'abbreviation') return 'abbreviation 缩写'
   if (normalizedGrammar.includes('pron') || normalizedGrammar === 'pronoun') return 'pronoun 代词'
   if (normalizedGrammar.includes('conj') || normalizedGrammar === 'conjunction') return 'conjunction 连词'
   if (normalizedGrammar.includes('interj') || normalizedGrammar === 'exclamation') return 'exclamation 感叹词'
@@ -1217,6 +1220,14 @@ function buildLookupSensePosGroups(senses: LookupSenseData[]): LookupSensePosGro
   })
 
   return posGroups
+}
+
+function createDefaultCollapsedLookupSenseGroups(posGroups: LookupSensePosGroup[]): Set<string> {
+  if (posGroups.length <= 1) {
+    return new Set()
+  }
+
+  return new Set(posGroups.map((group) => group.posTitle))
 }
 
 function createIdleLookupPanelState(): LookupPanelState {
@@ -1641,6 +1652,7 @@ export default function ReadingApp() {
   const [isBatchTagDialogOpen, setIsBatchTagDialogOpen] = useState(false)
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const [isLookupSearchDropdownOpen, setIsLookupSearchDropdownOpen] = useState(false)
+  const [isLookupWordDetailsExpanded, setIsLookupWordDetailsExpanded] = useState(false)
   const [collapsedLookupSenseGroups, setCollapsedLookupSenseGroups] = useState<Set<string>>(new Set())
   const [isLookupWordTagSelectorOpen, setIsLookupWordTagSelectorOpen] = useState(false)
   const [isLookupWordFavoriteSaving, setIsLookupWordFavoriteSaving] = useState(false)
@@ -1763,6 +1775,8 @@ export default function ReadingApp() {
     setLookupSearchInputValue('')
     clearLookupSearchResults()
     setIsLookupSearchDropdownOpen(false)
+    setCollapsedLookupSenseGroups(new Set())
+    setIsLookupWordDetailsExpanded(false)
     setIsLookupWordTagSelectorOpen(false)
     setIsLookupWordNoteEditing(false)
     setLookupWordNoteDraft('')
@@ -1910,6 +1924,66 @@ export default function ReadingApp() {
     shuffledSenseEntries
   ])
 
+  const playReadingLookupInitialAudio = async (headword: string, requestId: number) => {
+    const normalizedHeadword = headword.trim()
+    if (!readingAutoPlay || normalizedHeadword === '') {
+      return
+    }
+
+    const isCurrentLookupRequest = () => lookupRequestIdRef.current === requestId
+    const pronunciationType = readingAutoPlayAccent === 'uk' ? 'gb' : 'us'
+
+    try {
+      for (let variantIndex = 1; variantIndex <= READING_LOOKUP_AUDIO_VARIANT_LIMIT; variantIndex += 1) {
+        if (!isCurrentLookupRequest()) {
+          return
+        }
+
+        const filename = `${normalizedHeadword}__${pronunciationType}_${variantIndex}.mp3`
+        const result = await window.api.getAudio(filename)
+        if (!isCurrentLookupRequest()) {
+          return
+        }
+
+        if (result.success && result.data) {
+          const { audioManager } = await import('./utils/audioManager')
+          if (!isCurrentLookupRequest()) {
+            return
+          }
+
+          const url = `data:${result.mimeType};base64,${result.data}`
+          await audioManager.playUrl(url)
+          return
+        }
+      }
+
+      if (!isCurrentLookupRequest()) {
+        return
+      }
+
+      const { audioManager } = await import('./utils/audioManager')
+      if (!isCurrentLookupRequest()) {
+        return
+      }
+
+      await audioManager.playTts(normalizedHeadword, 1)
+    } catch (error) {
+      console.error('Failed to auto-play reading lookup pronunciation:', error)
+      if (!isCurrentLookupRequest()) {
+        return
+      }
+
+      try {
+        const { audioManager } = await import('./utils/audioManager')
+        if (isCurrentLookupRequest()) {
+          await audioManager.playTts(normalizedHeadword, 1)
+        }
+      } catch (ttsError) {
+        console.error('Reading lookup TTS fallback failed:', ttsError)
+      }
+    }
+  }
+
   const loadLookupByWordId = async (
     wordId: number,
     queryText: string,
@@ -1936,6 +2010,8 @@ export default function ReadingApp() {
       selectedSenseId
     })
     setIsLookupWordTagSelectorOpen(false)
+    setIsLookupWordDetailsExpanded(false)
+    setCollapsedLookupSenseGroups(new Set())
     setIsLookupWordNoteEditing(false)
     setLookupWordNoteDraft('')
 
@@ -1956,6 +2032,9 @@ export default function ReadingApp() {
         note: wordNoteResult.success ? wordNoteResult.note || undefined : undefined
       }
       const lookupSenses = (data.senses || []) as LookupSenseData[]
+      const defaultCollapsedGroups = createDefaultCollapsedLookupSenseGroups(
+        buildLookupSensePosGroups(lookupSenses)
+      )
 
       setLookupPanelState({
         tokenId,
@@ -1969,6 +2048,8 @@ export default function ReadingApp() {
         senses: lookupSenses,
         selectedSenseId
       })
+      setCollapsedLookupSenseGroups(defaultCollapsedGroups)
+      void playReadingLookupInitialAudio(lookupWord.headword || selectedEntryHeadword, requestId)
     } catch (error) {
       console.error('Load lookup word senses failed:', error)
       if (lookupRequestIdRef.current !== requestId) {
@@ -1988,6 +2069,7 @@ export default function ReadingApp() {
         selectedSenseId: null,
         errorMessage: '加载释义失败'
       })
+      setCollapsedLookupSenseGroups(new Set())
     }
   }
 
@@ -2025,6 +2107,7 @@ export default function ReadingApp() {
       senses: [],
       selectedSenseId: null
     })
+    setCollapsedLookupSenseGroups(new Set())
 
     try {
       const searchResults = await window.api.searchWord(entry.sourceLabel, 10)
@@ -2045,6 +2128,7 @@ export default function ReadingApp() {
           senses: [],
           selectedSenseId: null
         })
+        setCollapsedLookupSenseGroups(new Set())
         return
       }
 
@@ -2078,6 +2162,7 @@ export default function ReadingApp() {
         selectedSenseId: null,
         errorMessage: '查词失败'
       })
+      setCollapsedLookupSenseGroups(new Set())
     }
   }
 
@@ -3174,61 +3259,83 @@ export default function ReadingApp() {
                   </div>
                 </div>
 
-                {lookupPanelState.word && (
-                  <>
-                    <WordPronunciation
-                      headword={lookupPanelState.word.headword}
-                      phonUk={lookupPanelState.word.phon_uk}
-                      phonUs={lookupPanelState.word.phon_us}
-                      autoPlay={readingAutoPlay}
-                      autoPlayAccent={readingAutoPlayAccent}
-                      size="compact"
-                      className="mt-3"
-                    />
+                {lookupPanelState.word && !lookupRedirectTarget && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsLookupWordDetailsExpanded((isExpanded) => !isExpanded)}
+                      className="ml-auto flex items-center gap-1 px-1 py-1 text-[11px] font-medium text-slate-400 transition hover:text-slate-600"
+                      aria-label={isLookupWordDetailsExpanded ? '收起详情' : '展开详情'}
+                    >
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-slate-400">
+                        {isLookupWordDetailsExpanded ? '收起' : '展开'}
+                        <svg
+                          className={`h-3.5 w-3.5 transition-transform ${
+                            isLookupWordDetailsExpanded ? 'rotate-90' : 'rotate-0'
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </span>
+                    </button>
 
-                    {!lookupRedirectTarget && (
-                      <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                        <div className="flex min-w-0 items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                              {lookupWordVisibleTags.map((tag) => (
-                                <span
-                                  key={tag.id}
-                                  className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"
-                                >
-                                  <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                  </svg>
-                                  <span className="truncate">{tag.name}</span>
-                                </span>
-                              ))}
+                    {isLookupWordDetailsExpanded && (
+                      <div className="px-0 pb-3 pt-2">
+                        <WordPronunciation
+                          headword={lookupPanelState.word.headword}
+                          phonUk={lookupPanelState.word.phon_uk}
+                          phonUs={lookupPanelState.word.phon_us}
+                          autoPlay={false}
+                          autoPlayAccent={readingAutoPlayAccent}
+                          size="compact"
+                        />
+
+                        <div className="mt-3 rounded-2xl border border-slate-100 bg-white px-3 py-3">
+                          <div className="flex min-w-0 items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                {lookupWordVisibleTags.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"
+                                  >
+                                    <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                    </svg>
+                                    <span className="truncate">{tag.name}</span>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => void handleLookupWordFavoriteToggle()}
-                              disabled={isLookupWordFavoriteSaving}
-                              className={`favorite-btn ${
-                                isLookupWordFavorited ? 'active' : 'text-gray-300'
-                              } ${isLookupWordFavoriteSaving ? 'cursor-not-allowed opacity-60' : ''}`}
-                              title={isLookupWordFavorited ? '取消收藏' : '收藏'}
-                            >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => void handleLookupWordFavoriteToggle()}
+                                disabled={isLookupWordFavoriteSaving}
+                                className={`favorite-btn ${
+                                  isLookupWordFavorited ? 'active' : 'text-gray-300'
+                                } ${isLookupWordFavoriteSaving ? 'cursor-not-allowed opacity-60' : ''}`}
+                                data-action-tooltip={isLookupWordFavorited ? '取消收藏' : '收藏'}
+                                aria-label={isLookupWordFavorited ? '取消收藏' : '收藏'}
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                                />
-                              </svg>
-                            </button>
+                                <svg
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                  />
+                                </svg>
+                              </button>
 
                             <button
                               type="button"
@@ -3238,7 +3345,8 @@ export default function ReadingApp() {
                                   ? 'is-tag-active'
                                   : 'text-gray-300'
                               }`}
-                              title="管理标签"
+                              data-action-tooltip="管理标签"
+                              aria-label="管理标签"
                             >
                               <svg
                                 className="h-4 w-4"
@@ -3259,7 +3367,8 @@ export default function ReadingApp() {
                                   ? 'is-archive-active'
                                   : 'text-gray-300'
                               } ${isLookupWordArchiveSaving ? 'cursor-not-allowed opacity-60' : ''}`}
-                              title={isLookupWordArchived ? '取消归档' : '归档'}
+                              data-action-tooltip={isLookupWordArchived ? '取消归档' : '归档'}
+                              aria-label={isLookupWordArchived ? '取消归档' : '归档'}
                             >
                               <ArchiveIcon className="h-4 w-4" />
                             </button>
@@ -3272,7 +3381,8 @@ export default function ReadingApp() {
                                   ? 'is-note-active'
                                   : 'text-gray-300'
                               }`}
-                              title="添加/编辑笔记"
+                              data-action-tooltip="添加/编辑笔记"
+                              aria-label="添加/编辑笔记"
                             >
                               <svg
                                 className="h-4 w-4"
@@ -3345,8 +3455,9 @@ export default function ReadingApp() {
                                 <button
                                   type="button"
                                   onClick={startLookupWordNoteEditing}
-                                  className="absolute right-1.5 top-1.5 rounded p-0.5 text-gray-400 opacity-0 transition-all hover:bg-yellow-100 hover:text-yellow-600 group-hover:opacity-100"
-                                  title="编辑笔记"
+                                  className="action-tooltip-trigger absolute right-1.5 top-1.5 rounded p-0.5 text-gray-400 opacity-0 transition-all hover:bg-yellow-100 hover:text-yellow-600 group-hover:opacity-100"
+                                  data-action-tooltip="编辑笔记"
+                                  aria-label="编辑笔记"
                                 >
                                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3356,9 +3467,10 @@ export default function ReadingApp() {
                             )}
                           </div>
                         )}
+                        </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 

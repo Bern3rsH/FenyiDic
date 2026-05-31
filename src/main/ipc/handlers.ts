@@ -15,7 +15,8 @@ import {
   CreateCustomEntryPayload,
   UpdateCustomEntryPayload,
   DeleteCustomEntryPayload,
-  DeleteCustomWordPayload
+  DeleteCustomWordPayload,
+  ImportItem
 } from '../../shared/types'
 import { getAudio, initMdd, disposeMdd } from '../services/mdd-service'
 import {
@@ -2079,39 +2080,154 @@ export function registerIpcHandlers(): void {
   })
 
   // 批量导入收藏
-  ipcMain.handle(IPC_CHANNELS.IMPORT_FAVORITES, (_event, items: Array<{ headword: string; note?: string }>) => {
+  ipcMain.handle(IPC_CHANNELS.IMPORT_FAVORITES, (_event, items: ImportItem[]) => {
     const db = getDatabase()
     
     // 获取或创建收藏标签
     const favoriteTagId = ensureSystemTagId(FAVORITE_TAG_NAME)
+    const archivedTagId = ensureSystemTagId(ARCHIVED_TAG_NAME)
     
     // 使用事务来批量处理，提高性能
-    const transaction = db.transaction((itemsToImport: Array<{ headword: string; note?: string }>) => {
+    const transaction = db.transaction((itemsToImport: ImportItem[]) => {
       let importedCount = 0
       
       // 修改：同时获取 definition_html 以检测跳转
       const findWordStmt = db.prepare('SELECT id, definition_html FROM words WHERE headword = ?')
-      const findSensesStmt = db.prepare('SELECT id FROM senses WHERE word_id = ?')
+      const findWordByIdStmt = db.prepare('SELECT id, definition_html FROM words WHERE id = ?')
+      const findCustomWordByExternalIdStmt = db.prepare('SELECT -id as id, definition_html FROM user_db.custom_words WHERE id = ?')
+      const findSenseByIdStmt = db.prepare('SELECT id FROM senses WHERE id = ?')
+      const findCustomSenseByExternalIdStmt = db.prepare('SELECT -id as id FROM user_db.custom_senses WHERE id = ?')
+      const findSenseByWordAndIndexStmt = db.prepare('SELECT id FROM senses WHERE word_id = ? AND sense_index = ?')
+      const findCustomSenseByWordAndIndexStmt = db.prepare('SELECT -id as id FROM user_db.custom_senses WHERE word_id = ? AND sense_index = ?')
+      const findTagByNameStmt = db.prepare('SELECT id FROM user_db.tags WHERE name = ?')
+      const createTagStmt = db.prepare('INSERT INTO user_db.tags (name, color) VALUES (?, ?)')
       
       // 通过标签系统添加收藏
-      const insertFavStmt = db.prepare(`
+      const insertSenseTagStmt = db.prepare(`
         INSERT INTO user_db.sense_tags (sense_id, tag_id, created_at) 
         VALUES (?, ?, datetime('now'))
         ON CONFLICT(sense_id, tag_id) DO NOTHING
       `)
+      const insertWordTagStmt = db.prepare(`
+        INSERT INTO user_db.word_tags (word_id, tag_id, created_at)
+        VALUES (?, ?, datetime('now'))
+        ON CONFLICT(word_id, tag_id) DO NOTHING
+      `)
 
       // 插入/更新独立笔记
-      const upsertNoteStmt = db.prepare(`
+      const upsertSenseNoteStmt = db.prepare(`
         INSERT INTO user_db.sense_notes (sense_id, note, updated_at)
         VALUES (?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(sense_id) DO UPDATE SET
           note = excluded.note,
           updated_at = CURRENT_TIMESTAMP
       `)
+      const upsertWordNoteStmt = db.prepare(`
+        INSERT INTO user_db.word_notes (word_id, note, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(word_id) DO UPDATE SET
+          note = excluded.note,
+          updated_at = CURRENT_TIMESTAMP
+      `)
+
+      const hasExportRestoreMetadata = (item: ImportItem): boolean =>
+        item.noteType !== undefined ||
+        item.tags !== undefined ||
+        item.favorite !== undefined ||
+        item.archived !== undefined ||
+        item.wordId !== undefined ||
+        item.senseId !== undefined ||
+        item.senseIndex !== undefined ||
+        item.manualEntry !== undefined
+
+      const splitImportedTagNames = (rawTags: string | undefined): string[] => {
+        if (!rawTags?.trim()) return []
+        return Array.from(new Set(rawTags.split(/[\s;]+/).map((tagName) => tagName.trim()).filter(Boolean)))
+          .filter((tagName) => !isSystemTagName(tagName))
+      }
+
+      const getOrCreateImportedTagId = (tagName: string): number => {
+        const existingTag = findTagByNameStmt.get(tagName) as { id: number } | undefined
+        if (existingTag) return existingTag.id
+        return Number(createTagStmt.run(tagName, '#3B82F6').lastInsertRowid)
+      }
+
+      const applyImportedTags = (entityType: EntityType, entityId: number, tagIds: number[]) => {
+        const statement = entityType === 'sense' ? insertSenseTagStmt : insertWordTagStmt
+        for (const tagId of tagIds) {
+          statement.run(entityId, tagId)
+        }
+      }
+
+      const resolveImportedWordId = (item: ImportItem): number | null => {
+        if (Number.isInteger(item.wordId) && item.wordId !== 0) {
+          if (item.wordId! > 0) {
+            const word = findWordByIdStmt.get(item.wordId) as { id: number } | undefined
+            if (word) return word.id
+          } else {
+            const customWord = findCustomWordByExternalIdStmt.get(Math.abs(item.wordId!)) as { id: number } | undefined
+            if (customWord) return customWord.id
+          }
+        }
+
+        if (!item.headword?.trim()) return null
+        const word = findWordStmt.get(item.headword.trim()) as { id: number; definition_html: string } | undefined
+        return word?.id ?? null
+      }
+
+      const resolveImportedSenseId = (item: ImportItem): number | null => {
+        if (Number.isInteger(item.senseId) && item.senseId !== 0) {
+          if (item.senseId! > 0) {
+            const sense = findSenseByIdStmt.get(item.senseId) as { id: number } | undefined
+            if (sense) return sense.id
+          } else {
+            const customSense = findCustomSenseByExternalIdStmt.get(Math.abs(item.senseId!)) as { id: number } | undefined
+            if (customSense) return customSense.id
+          }
+        }
+
+        const wordId = resolveImportedWordId(item)
+        if (!wordId || !Number.isInteger(item.senseIndex)) return null
+
+        if (wordId > 0) {
+          const sense = findSenseByWordAndIndexStmt.get(wordId, item.senseIndex) as { id: number } | undefined
+          return sense?.id ?? null
+        }
+
+        const customSense = findCustomSenseByWordAndIndexStmt.get(Math.abs(wordId), item.senseIndex) as { id: number } | undefined
+        return customSense?.id ?? null
+      }
       
       for (const item of itemsToImport) {
         if (!item.headword || !item.headword.trim()) continue
         const cleanWord = item.headword.trim()
+        const importedCustomTagIds = splitImportedTagNames(item.tags).map(getOrCreateImportedTagId)
+
+        if (hasExportRestoreMetadata(item)) {
+          const resolvedNoteType = item.noteType || (item.senseId !== undefined ? 'sense' : 'word')
+
+          if (resolvedNoteType === 'word') {
+            const wordId = resolveImportedWordId(item)
+            if (!wordId) continue
+
+            applyImportedTags('word', wordId, importedCustomTagIds)
+            if (item.favorite === true) insertWordTagStmt.run(wordId, favoriteTagId)
+            if (item.archived === true) insertWordTagStmt.run(wordId, archivedTagId)
+            if (item.note?.trim()) upsertWordNoteStmt.run(wordId, item.note.trim())
+            importedCount += 1
+            continue
+          }
+
+          const senseId = resolveImportedSenseId(item)
+          if (!senseId) continue
+
+          applyImportedTags('sense', senseId, importedCustomTagIds)
+          if (item.favorite === true) insertSenseTagStmt.run(senseId, favoriteTagId)
+          if (item.archived === true) insertSenseTagStmt.run(senseId, archivedTagId)
+          if (item.note?.trim()) upsertSenseNoteStmt.run(senseId, item.note.trim())
+          importedCount += 1
+          continue
+        }
         
         
         let wordResult = findWordStmt.get(cleanWord) as { id: number; definition_html: string } | undefined
@@ -2139,16 +2255,11 @@ export function registerIpcHandlers(): void {
         }
         
         if (wordResult) {
-          const senses = findSensesStmt.all(wordResult.id) as { id: number }[]
-          for (const sense of senses) {
-            // 1. 添加收藏标签
-            insertFavStmt.run(sense.id, favoriteTagId)
-            // 2. 如果有笔记，保存到独立笔记表
-            if (item.note && item.note.trim()) {
-              upsertNoteStmt.run(sense.id, item.note.trim())
-            }
+          insertWordTagStmt.run(wordResult.id, favoriteTagId)
+          if (item.note && item.note.trim()) {
+            upsertWordNoteStmt.run(wordResult.id, item.note.trim())
           }
-          if (senses.length > 0) importedCount++
+          importedCount++
         }
       }
       return importedCount

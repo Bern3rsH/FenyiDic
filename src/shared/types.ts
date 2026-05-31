@@ -391,4 +391,16 @@ export const IPC_CHANNELS = {
 export interface ImportItem {
   headword: string
   note?: string
+  noteType?: EntityType
+  tags?: string
+  favorite?: boolean
+  archived?: boolean
+  wordId?: number
+  senseId?: number
+  senseIndex?: number
+  manualEntry?: boolean
+  definition?: string
+  definitionCn?: string
+  grammar?: string
+  examples?: string
 }

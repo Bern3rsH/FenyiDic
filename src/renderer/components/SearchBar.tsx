@@ -158,7 +158,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
         value={query}
         onChange={(e) => updateQuery(e.target.value)}
         onFocus={handleInputFocus}
-        placeholder="输入并搜索"
+        placeholder="输入英文并查询释义"
         className={searchInputClassName}
         autoFocus={!isNavVariant}
       />
@@ -190,7 +190,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
               >
                 <span>没有想要的？手动录入「{manualEntryPreview}」</span>
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
                 </svg>
               </button>
             </div>
@@ -214,7 +214,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                 className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-5 py-2.5 text-sm font-medium text-blue-700 transition hover:border-blue-200 hover:bg-blue-100"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
                 </svg>
                 <span>词典里没有？手动录入「{manualEntryPreview}」</span>
               </button>
@@ -285,7 +285,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                     <div className="mt-0.5 text-xs text-blue-600/80">适合词典里没有的短语、句子或自定义释义</div>
                   </div>
                   <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
                   </svg>
                 </button>
               )}
@@ -302,7 +302,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                 <div className="mt-0.5 text-xs text-gray-400">适合词典里没有的短语、句子或自定义释义</div>
               </div>
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
               </svg>
             </button>
           )}

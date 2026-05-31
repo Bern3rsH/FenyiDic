@@ -73,7 +73,7 @@ export default function OverflowActionMenu({
           setIsOpen((currentState) => !currentState)
         }}
         className={`favorite-btn ${isOpen ? 'is-menu-active' : 'text-gray-300'}`}
-        title={buttonTitle}
+        data-action-tooltip={buttonTitle}
         aria-label={buttonTitle}
         aria-expanded={isOpen}
       >

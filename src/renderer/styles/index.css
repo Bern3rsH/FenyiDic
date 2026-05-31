@@ -122,7 +122,43 @@ body {
 
 /* 收藏按钮样式 */
 .favorite-btn {
-  @apply rounded-full bg-white p-1 ring-1 ring-transparent transition-colors hover:bg-gray-100;
+  @apply relative inline-flex items-center justify-center rounded-full bg-white p-1 ring-1 ring-transparent transition-colors hover:bg-gray-100;
+}
+
+.action-tooltip-trigger {
+  position: relative;
+}
+
+.favorite-btn[data-action-tooltip]::after,
+.action-tooltip-trigger[data-action-tooltip]::after {
+  content: attr(data-action-tooltip);
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  left: 50%;
+  z-index: 50;
+  width: max-content;
+  max-width: 10rem;
+  transform: translateX(-50%);
+  border-radius: 0.375rem;
+  background: rgb(15 23 42);
+  color: white;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0;
+  padding: 0.375rem 0.5rem;
+  pointer-events: none;
+  white-space: nowrap;
+  visibility: hidden;
+  transition: opacity 75ms ease, visibility 75ms ease;
+}
+
+.favorite-btn[data-action-tooltip]:hover::after,
+.favorite-btn[data-action-tooltip]:focus-visible::after,
+.action-tooltip-trigger[data-action-tooltip]:hover::after,
+.action-tooltip-trigger[data-action-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
 }
 
 .favorite-btn.active {

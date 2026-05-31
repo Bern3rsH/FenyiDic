@@ -7,7 +7,7 @@ import { useConfirmDialog } from './ConfirmDialog'
 import TagManagerDialog from './TagManagerDialog'
 import BatchTagDialog, { type BatchTagDialogMode } from './BatchTagDialog'
 import { SYSTEM_TAGS } from '../../shared/types'
-import type { EntityType, FavoriteListItem, FavoriteSenseItem, FavoriteWordItem, Tag } from '../../shared/types'
+import type { EntityType, FavoriteListItem, FavoriteSenseItem, FavoriteWordItem, ImportItem, Tag } from '../../shared/types'
 import { entityCapabilities } from '../constants/entityCapabilities'
 
 function isIdiomGroup(senseGroup?: string): boolean {
@@ -43,6 +43,7 @@ function inferPos(grammar?: string, senseGroup?: string): string {
     return 'verb 动词'
   }
   if (normalizedGrammar.includes('prep') || normalizedGrammar === 'preposition') return 'preposition 介词'
+  if (normalizedGrammar.includes('abbr') || normalizedGrammar === 'abbreviation') return 'abbreviation 缩写'
   if (normalizedGrammar.includes('pron') || normalizedGrammar === 'pronoun') return 'pronoun 代词'
   if (normalizedGrammar.includes('conj') || normalizedGrammar === 'conjunction') return 'conjunction 连词'
   if (normalizedGrammar.includes('interj') || normalizedGrammar.includes('exclamation')) return 'exclamation 感叹词'
@@ -75,6 +76,32 @@ type FavoriteRecord = FavoriteListItem & {
   sense_id?: number
   created_at?: string
 }
+
+const FAVORITE_LIST_PAGE_SIZE = 24
+const CSV_EXPORT_MIME_TYPE = 'text/csv;charset=utf-8'
+const CSV_EXPORT_HEADERS = [
+  'word',
+  'front',
+  'back',
+  'definition',
+  'definition_cn',
+  'grammar',
+  'sense_index',
+  'examples',
+  'note',
+  'tags',
+  'favorite',
+  'archived',
+  'note_type',
+  'item_id',
+  'word_id',
+  'sense_id',
+  'manual_entry',
+  'created_at'
+] as const
+const BATCH_ACTION_BUTTON_BASE_CLASS = 'text-xs px-2.5 py-1 rounded border transition-colors'
+const BATCH_ACTION_BUTTON_ENABLED_CLASS = 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+const BATCH_ACTION_BUTTON_DISABLED_CLASS = 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
 
 const createDefaultFilterState = (): FilterState => ({
   showFavorited: false,
@@ -139,6 +166,100 @@ const getFavoriteItemEntityId = (favoriteItem: FavoriteListItem): number => {
 
 const isManualEntryItem = (favoriteItem: FavoriteListItem): boolean =>
   getFavoriteItemEntityId(favoriteItem) < 0
+
+const escapeCsvCell = (rawValue: string | number | boolean | null | undefined): string => {
+  const stringValue = rawValue === null || rawValue === undefined ? '' : String(rawValue)
+  if (!/[",\n\r]/.test(stringValue)) {
+    return stringValue
+  }
+  return `"${stringValue.replace(/"/g, '""')}"`
+}
+
+const isCsvExportSystemTag = (tag: Tag): boolean =>
+  tag.name === SYSTEM_TAGS.FAVORITE.name || tag.name === SYSTEM_TAGS.ARCHIVED.name
+
+const isFavoriteItemCsvFavorited = (favoriteItem: FavoriteListItem): boolean =>
+  isSenseItem(favoriteItem)
+    ? favoriteItem.isFavorited
+    : (favoriteItem.tags || []).some((tag) => tag.name === SYSTEM_TAGS.FAVORITE.name)
+
+const buildCsvExportBack = (favoriteItem: FavoriteListItem): string => {
+  if (!isSenseItem(favoriteItem)) {
+    return favoriteItem.note || ''
+  }
+
+  return [
+    favoriteItem.definitionCn,
+    favoriteItem.definition,
+    favoriteItem.grammar,
+    favoriteItem.examples,
+    favoriteItem.note ? `笔记: ${favoriteItem.note}` : ''
+  ].filter(Boolean).join('\n\n')
+}
+
+const buildCsvExportFront = (favoriteItem: FavoriteListItem): string => {
+  if (!isSenseItem(favoriteItem) || !favoriteItem.examples) {
+    return favoriteItem.headword
+  }
+
+  return [favoriteItem.headword, favoriteItem.examples].join('\n\n')
+}
+
+const buildFavoriteCsv = (favoriteItems: FavoriteListItem[]): string => {
+  const csvRows = favoriteItems.map((favoriteItem) => {
+    const senseItem = isSenseItem(favoriteItem) ? favoriteItem : null
+    const noteType = getFavoriteItemEntityType(favoriteItem)
+    const rowValues = [
+      favoriteItem.headword,
+      buildCsvExportFront(favoriteItem),
+      buildCsvExportBack(favoriteItem),
+      senseItem?.definition ?? '',
+      senseItem?.definitionCn ?? '',
+      senseItem?.grammar ?? '',
+      senseItem?.senseIndex ?? '',
+      senseItem?.examples ?? '',
+      favoriteItem.note || '',
+      (favoriteItem.tags || []).filter((tag) => !isCsvExportSystemTag(tag)).map((tag) => tag.name).join(' '),
+      isFavoriteItemCsvFavorited(favoriteItem),
+      favoriteItem.isArchived,
+      noteType,
+      getFavoriteItemEntityId(favoriteItem),
+      favoriteItem.wordId,
+      senseItem?.senseId ?? '',
+      isManualEntryItem(favoriteItem),
+      favoriteItem.createdAt
+    ]
+    return rowValues.map(escapeCsvCell).join(',')
+  })
+
+  return [
+    CSV_EXPORT_HEADERS.join(','),
+    ...csvRows
+  ].join('\n')
+}
+
+const downloadCsv = (fileName: string, csvContent: string): void => {
+  const csvBlob = new Blob([`\uFEFF${csvContent}`], { type: CSV_EXPORT_MIME_TYPE })
+  const objectUrl = URL.createObjectURL(csvBlob)
+  const downloadLink = document.createElement('a')
+  downloadLink.href = objectUrl
+  downloadLink.download = fileName
+  downloadLink.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+const formatCsvExportTimestamp = (date: Date): string => {
+  const padTwoDigits = (value: number): string => String(value).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    padTwoDigits(date.getMonth() + 1),
+    padTwoDigits(date.getDate())
+  ].join('') + '-' + [
+    padTwoDigits(date.getHours()),
+    padTwoDigits(date.getMinutes()),
+    padTwoDigits(date.getSeconds())
+  ].join('')
+}
 
 const normalizeFavoriteItems = (favoriteItems: FavoriteRecord[]): FavoriteListItem[] => {
   const dedupedItemsByEntity = new Map<string, FavoriteListItem>()
@@ -250,12 +371,15 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
   const [filterStateByTab, setFilterStateByTab] = useState<Record<EntityType, FilterState>>(
     createFilterStateByTab
   )
+  const [currentPage, setCurrentPage] = useState(1)
   const [showTagManager, setShowTagManager] = useState(false)
   const [wordTagSelectorState, setWordTagSelectorState] = useState<WordTagSelectorState | null>(null)
   const [batchTagDialogMode, setBatchTagDialogMode] = useState<BatchTagDialogMode | null>(null)
   const { confirm, alert, DialogComponent } = useConfirmDialog()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const favoriteListRootRef = useRef<HTMLDivElement>(null)
+  const favoriteListScrollRef = useRef<HTMLDivElement>(null)
   const activeCapabilities = entityCapabilities[activeTab]
   const canUseSelectionMode =
     activeCapabilities.canFavorite ||
@@ -266,6 +390,65 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
 
   const triggerImport = () => {
     fileInputRef.current?.click()
+  }
+
+  const showImportMappingInfo = async () => {
+    const importConfig = await import('./../import-config.json').then((module) => module.default)
+    await alert({
+      title: 'CSV 导入字段说明',
+      message: [
+        '普通 CSV：',
+        `会读取 ${importConfig.fields.word.join(', ')} 作为单词列，并把匹配到的词导入为单词级收藏卡片。`,
+        `如果包含 ${importConfig.fields.note.join(', ')}，会同时导入为单词笔记。`,
+        '',
+        'FenyiDic 导出的 CSV：',
+        '会读取 note_type、word_id、sense_id、sense_index、tags、favorite、archived、note，用于还原条目类型、标签、收藏、归档和笔记。',
+        '',
+        'front、back、definition、definition_cn、grammar、examples 等内容列主要用于 Anki 或人工查看，导入时不覆盖词典释义。',
+        '如果找不到单词列，会询问是否使用第一列作为单词列。'
+      ].join('\n'),
+      type: 'info'
+    })
+  }
+
+  const scrollBatchToolbarIntoView = () => {
+    requestAnimationFrame(() => {
+      favoriteListRootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      favoriteListScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  }
+
+  const toggleSelectionMode = () => {
+    if (!canUseSelectionMode) return
+    if (isSelectionMode) {
+      setIsSelectionMode(false)
+      setSelectedEntityIds(new Set())
+      return
+    }
+
+    setIsSelectionMode(true)
+    scrollBatchToolbarIntoView()
+  }
+
+  const getBatchActionButtonClass = (isEnabled: boolean): string =>
+    `${BATCH_ACTION_BUTTON_BASE_CLASS} ${
+      isEnabled ? BATCH_ACTION_BUTTON_ENABLED_CLASS : BATCH_ACTION_BUTTON_DISABLED_CLASS
+    }`
+
+  const handleExportSelected = async () => {
+    const selectedFavoriteItems = visibleFavorites.filter((favoriteItem) =>
+      selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem))
+    )
+
+    if (selectedFavoriteItems.length === 0) {
+      await alert({ title: '导出失败', message: '请先选择要导出的项目', type: 'warning' })
+      return
+    }
+
+    const exportTimestamp = formatCsvExportTimestamp(new Date())
+    const csvContent = buildFavoriteCsv(selectedFavoriteItems)
+    downloadCsv(`fenyidic-${activeTab}-selected-${exportTimestamp}.csv`, csvContent)
   }
 
   useEffect(() => {
@@ -409,11 +592,26 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     return Array.from(dedupedVisibleFavoritesByEntity.values())
   }, [activeTab, filteredFavorites])
 
+  const totalPages = Math.max(1, Math.ceil(visibleFavorites.length / FAVORITE_LIST_PAGE_SIZE))
+  const paginatedFavorites = useMemo(() => {
+    const startIndex = (currentPage - 1) * FAVORITE_LIST_PAGE_SIZE
+    return visibleFavorites.slice(startIndex, startIndex + FAVORITE_LIST_PAGE_SIZE)
+  }, [currentPage, visibleFavorites])
+  const selectedCurrentPageCount = paginatedFavorites.filter((favoriteItem) =>
+    selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem))
+  ).length
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   const handleFilterChange = (newFilters: FilterState) => {
     setFilterStateByTab((previousFilterStateByTab) => ({
       ...previousFilterStateByTab,
       [activeTab]: newFilters
     }))
+    setCurrentPage(1)
     setIsSelectionMode(false)
     setSelectedEntityIds(new Set())
     setEditingWordNoteId(null)
@@ -426,6 +624,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
       return
     }
     setActiveTab(nextTab)
+    setCurrentPage(1)
     setIsSelectionMode(false)
     setSelectedEntityIds(new Set())
     setEditingWordNoteId(null)
@@ -455,11 +654,29 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
   }
 
   const handleSelectAll = () => {
-    if (selectedEntityIds.size === visibleFavorites.length) {
-      setSelectedEntityIds(new Set())
+    if (paginatedFavorites.length === 0) {
       return
     }
-    setSelectedEntityIds(new Set(visibleFavorites.map((favoriteItem) => getFavoriteItemEntityId(favoriteItem))))
+
+    const currentPageEntityIds = paginatedFavorites.map((favoriteItem) => getFavoriteItemEntityId(favoriteItem))
+    const hasSelectedEveryCurrentPageItem = currentPageEntityIds.every((entityId) => selectedEntityIds.has(entityId))
+    const nextSelectedEntityIds = new Set(selectedEntityIds)
+
+    if (hasSelectedEveryCurrentPageItem) {
+      currentPageEntityIds.forEach((entityId) => nextSelectedEntityIds.delete(entityId))
+    } else {
+      currentPageEntityIds.forEach((entityId) => nextSelectedEntityIds.add(entityId))
+    }
+
+    setSelectedEntityIds(nextSelectedEntityIds)
+  }
+
+  const goToPreviousPage = () => {
+    setCurrentPage((previousPage) => Math.max(1, previousPage - 1))
+  }
+
+  const goToNextPage = () => {
+    setCurrentPage((previousPage) => Math.min(totalPages, previousPage + 1))
   }
 
   const resetBatchSelection = (options: { keepTagDialogOpen?: boolean } = {}) => {
@@ -722,7 +939,12 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
     for (let index = 0; index < lineText.length; index += 1) {
       const currentChar = lineText[index]
       if (currentChar === '"') {
-        isQuoted = !isQuoted
+        if (isQuoted && lineText[index + 1] === '"') {
+          currentColumn += '"'
+          index += 1
+        } else {
+          isQuoted = !isQuoted
+        }
       } else if (currentChar === delimiter && !isQuoted) {
         parsedColumns.push(currentColumn)
         currentColumn = ''
@@ -783,8 +1005,13 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
         for (let index = 0; index < csvText.length; index += 1) {
           const currentChar = csvText[index]
           if (currentChar === '"') {
-            isQuoted = !isQuoted
-            currentLine += currentChar
+            if (isQuoted && csvText[index + 1] === '"') {
+              currentLine += currentChar + csvText[index + 1]
+              index += 1
+            } else {
+              isQuoted = !isQuoted
+              currentLine += currentChar
+            }
           } else if (currentChar === '\n' && !isQuoted) {
             if (currentLine.trim()) {
               parsedLines.push(currentLine)
@@ -814,18 +1041,38 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
 
       const headerColumns = parseCsvLine(headerLine, delimiter)
       const normalizedHeaders = headerColumns.map((headerColumn) =>
-        headerColumn.trim().replace(/^"|"$/g, '').toLowerCase()
+        headerColumn.trim().toLowerCase()
       )
 
       const importConfig = await import('./../import-config.json').then((module) => module.default)
-      let wordColumnIndex = -1
-      for (const possibleWordColumnName of importConfig.fields.word) {
-        const foundIndex = normalizedHeaders.indexOf(possibleWordColumnName.toLowerCase())
-        if (foundIndex !== -1) {
-          wordColumnIndex = foundIndex
-          break
+      const findColumnIndex = (possibleColumnNames: string[]) => {
+        for (const possibleColumnName of possibleColumnNames) {
+          const foundIndex = normalizedHeaders.indexOf(possibleColumnName.toLowerCase())
+          if (foundIndex !== -1) {
+            return foundIndex
+          }
         }
+        return -1
       }
+      const getColumnValue = (columns: string[], columnIndex: number): string | undefined => {
+        if (columnIndex === -1) return undefined
+        const columnValue = columns[columnIndex]?.trim()
+        return columnValue || undefined
+      }
+      const parseOptionalNumber = (value: string | undefined): number | undefined => {
+        if (!value) return undefined
+        const parsedValue = Number(value)
+        return Number.isFinite(parsedValue) ? parsedValue : undefined
+      }
+      const parseOptionalBoolean = (value: string | undefined): boolean | undefined => {
+        if (!value) return undefined
+        const normalizedValue = value.trim().toLowerCase()
+        if (['true', '1', 'yes', 'y'].includes(normalizedValue)) return true
+        if (['false', '0', 'no', 'n'].includes(normalizedValue)) return false
+        return undefined
+      }
+
+      let wordColumnIndex = findColumnIndex(importConfig.fields.word)
 
       if (wordColumnIndex === -1) {
         const useFirstColumn = await confirm({
@@ -837,33 +1084,49 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
         wordColumnIndex = 0
       }
 
-      let noteColumnIndex = -1
-      for (const possibleNoteColumnName of importConfig.fields.note) {
-        const foundIndex = normalizedHeaders.indexOf(possibleNoteColumnName.toLowerCase())
-        if (foundIndex !== -1) {
-          noteColumnIndex = foundIndex
-          break
-        }
+      const noteColumnIndex = findColumnIndex(importConfig.fields.note)
+      const exportedColumnIndexes = {
+        noteType: findColumnIndex(['note_type', 'type']),
+        tags: findColumnIndex(['tags']),
+        favorite: findColumnIndex(['favorite', 'is_favorited']),
+        archived: findColumnIndex(['archived', 'is_archived']),
+        wordId: findColumnIndex(['word_id']),
+        senseId: findColumnIndex(['sense_id']),
+        senseIndex: findColumnIndex(['sense_index']),
+        manualEntry: findColumnIndex(['manual_entry']),
+        definition: findColumnIndex(['definition']),
+        definitionCn: findColumnIndex(['definition_cn']),
+        grammar: findColumnIndex(['grammar']),
+        examples: findColumnIndex(['examples'])
       }
-
-      const proceedImport = await confirm({
-        title: '导入确认',
-        message: `分隔符: ${delimiter === '\t' ? 'TAB' : '逗号'}\n单词列: ${normalizedHeaders[wordColumnIndex]} (索引 ${wordColumnIndex})\n笔记列: ${noteColumnIndex !== -1 ? normalizedHeaders[noteColumnIndex] : '未找到 (将留空)'}`,
-        confirmText: '开始导入'
-      })
-      if (!proceedImport) return
+      const hasExportRestoreColumns = Object.values(exportedColumnIndexes).some((columnIndex) => columnIndex !== -1)
 
       const importItems = parsedLines
         .slice(1)
         .map((line) => {
           const columns = parseCsvLine(line, delimiter)
-          let headword = columns[wordColumnIndex]?.trim()
-          let note = noteColumnIndex !== -1 ? columns[noteColumnIndex]?.trim() : undefined
+          const headword = getColumnValue(columns, wordColumnIndex)
+          const note = getColumnValue(columns, noteColumnIndex)
+          const rawNoteType = getColumnValue(columns, exportedColumnIndexes.noteType)
+          const noteType = rawNoteType === 'sense' || rawNoteType === 'word' ? rawNoteType : undefined
+          const item: ImportItem = {
+            headword: headword || '',
+            note,
+            noteType,
+            tags: getColumnValue(columns, exportedColumnIndexes.tags),
+            favorite: parseOptionalBoolean(getColumnValue(columns, exportedColumnIndexes.favorite)),
+            archived: parseOptionalBoolean(getColumnValue(columns, exportedColumnIndexes.archived)),
+            wordId: parseOptionalNumber(getColumnValue(columns, exportedColumnIndexes.wordId)),
+            senseId: parseOptionalNumber(getColumnValue(columns, exportedColumnIndexes.senseId)),
+            senseIndex: parseOptionalNumber(getColumnValue(columns, exportedColumnIndexes.senseIndex)),
+            manualEntry: parseOptionalBoolean(getColumnValue(columns, exportedColumnIndexes.manualEntry)),
+            definition: getColumnValue(columns, exportedColumnIndexes.definition),
+            definitionCn: getColumnValue(columns, exportedColumnIndexes.definitionCn),
+            grammar: getColumnValue(columns, exportedColumnIndexes.grammar),
+            examples: getColumnValue(columns, exportedColumnIndexes.examples)
+          }
 
-          if (headword) headword = headword.replace(/^"|"$/g, '')
-          if (note) note = note.replace(/^"|"$/g, '')
-
-          return { headword, note: note || undefined }
+          return item
         })
         .filter((item) => item.headword && item.headword.length > 0)
 
@@ -877,7 +1140,9 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
         await loadFavorites()
         await alert({
           title: '导入完成',
-          message: `成功添加了 ${importResult.count} 个相关单词的义项`,
+          message: hasExportRestoreColumns
+            ? `成功还原了 ${importResult.count} 个项目`
+            : `成功添加了 ${importResult.count} 个单词级卡片`,
           type: 'success'
         })
       } else {
@@ -932,130 +1197,114 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
         onTabChange={switchActiveTab}
         onManageTags={() => setShowTagManager(true)}
         onImport={triggerImport}
-        isSelectionMode={isSelectionMode}
-        canToggleSelectionMode={canUseSelectionMode}
-        onToggleSelectionMode={() => {
-          if (!canUseSelectionMode) return
-          if (isSelectionMode) {
-            setIsSelectionMode(false)
-            setSelectedEntityIds(new Set())
-          } else {
-            setIsSelectionMode(true)
-          }
-        }}
+        onImportInfo={() => void showImportMappingInfo()}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 h-full">
-        {isSelectionMode && canUseSelectionMode && (
-          <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-500">已选择 {selectedEntityIds.size} 项</div>
-              <button
-                onClick={handleSelectAll}
-                className="text-xs px-2.5 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                {selectedEntityIds.size === visibleFavorites.length && visibleFavorites.length > 0
-                  ? '取消'
-                  : '全选'}
-              </button>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              {activeCapabilities.canTag && (
-                <>
+      <div ref={favoriteListRootRef} className="flex-1 flex flex-col min-w-0 h-full">
+        {canUseSelectionMode && (
+          <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50">
+            <button
+              onClick={toggleSelectionMode}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isSelectionMode
+                  ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {isSelectionMode ? '退出批量管理' : '批量管理'}
+            </button>
+
+            {isSelectionMode && (
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-500">已选择 {selectedEntityIds.size} 项</div>
                   <button
-                    onClick={() => setBatchTagDialogMode('add')}
-                    disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-blue-500 text-white hover:bg-blue-600'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
+                    onClick={handleSelectAll}
+                    className="text-xs px-2.5 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                   >
-                    加标签
+                    {selectedCurrentPageCount === paginatedFavorites.length && paginatedFavorites.length > 0
+                      ? '取消'
+                      : '全选'}
                   </button>
                   <button
-                    onClick={() => setBatchTagDialogMode('remove')}
+                    onClick={() => void handleExportSelected()}
                     disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
+                    className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
                   >
-                    删标签
+                    导出 CSV
                   </button>
-                </>
-              )}
-              {activeCapabilities.canFavorite && (
-                <>
-                  <button
-                    onClick={() => void handleBatchFavoriteUpdate('add')}
-                    disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-rose-500 text-white hover:bg-rose-600'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    收藏
-                  </button>
-                  <button
-                    onClick={() => void handleBatchFavoriteUpdate('remove')}
-                    disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    取消收藏
-                  </button>
-                </>
-              )}
-              {activeCapabilities.canNote && (
-                <button
-                  onClick={() => void handleBatchClearNotes()}
-                  disabled={selectedEntityIds.size === 0}
-                  className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                    selectedEntityIds.size > 0
-                      ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  删除笔记
-                </button>
-              )}
-              {activeCapabilities.canArchive && (
-                <>
-                  <button
-                    onClick={() => void handleBatchArchiveUpdate('add')}
-                    disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-slate-600 text-white hover:bg-slate-700'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    归档
-                  </button>
-                  <button
-                    onClick={() => void handleBatchArchiveUpdate('remove')}
-                    disabled={selectedEntityIds.size === 0}
-                    className={`text-xs px-2.5 py-1 rounded transition-colors ${
-                      selectedEntityIds.size > 0
-                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    取消归档
-                  </button>
-                </>
-              )}
-            </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {activeCapabilities.canFavorite && (
+                    <>
+                      <button
+                        onClick={() => void handleBatchFavoriteUpdate('add')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        加入收藏
+                      </button>
+                      <button
+                        onClick={() => void handleBatchFavoriteUpdate('remove')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        取消收藏
+                      </button>
+                    </>
+                  )}
+                  {activeCapabilities.canTag && (
+                    <>
+                      <button
+                        onClick={() => setBatchTagDialogMode('add')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        添加标签
+                      </button>
+                      <button
+                        onClick={() => setBatchTagDialogMode('remove')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        删除标签
+                      </button>
+                    </>
+                  )}
+                  {activeCapabilities.canArchive && (
+                    <>
+                      <button
+                        onClick={() => void handleBatchArchiveUpdate('add')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        进行归档
+                      </button>
+                      <button
+                        onClick={() => void handleBatchArchiveUpdate('remove')}
+                        disabled={selectedEntityIds.size === 0}
+                        className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                      >
+                        取消归档
+                      </button>
+                    </>
+                  )}
+                  {activeCapabilities.canNote && (
+                    <button
+                      onClick={() => void handleBatchClearNotes()}
+                      disabled={selectedEntityIds.size === 0}
+                      className={getBatchActionButtonClass(selectedEntityIds.size > 0)}
+                    >
+                      删除笔记
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-3">
+        <div ref={favoriteListScrollRef} className="flex-1 overflow-y-auto p-3">
           {loading ? (
             <div className="text-center text-gray-500 py-8">加载中...</div>
           ) : visibleFavorites.length === 0 ? (
@@ -1063,116 +1312,179 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
               <p>没有匹配的记录</p>
             </div>
           ) : (
-            <div className={`grid gap-3 ${displayMode === 'cn' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              {visibleFavorites.map((favoriteItem) => (
-                <div
-                  key={`${getFavoriteItemEntityType(favoriteItem)}-${getFavoriteItemEntityId(favoriteItem)}`}
-                  className={`h-full relative transition-transform ${
-                    isSelectionMode && canUseSelectionMode ? 'cursor-pointer hover:scale-[1.01]' : ''
-                  }`}
-                  onClickCapture={
-                    isSelectionMode && canUseSelectionMode
-                      ? (event) => handleSelectionCardClickCapture(event, getFavoriteItemEntityId(favoriteItem))
-                      : undefined
-                  }
-                >
-                  {isWordItem(favoriteItem) ? (
-                    <div className="h-full p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative">
-                      {(() => {
-                        const isWordFavorited = (favoriteItem.tags || []).some(
-                          (tag) => tag.name === SYSTEM_TAGS.FAVORITE.name
-                        )
-                        const isWordArchived = (favoriteItem.tags || []).some(
-                          (tag) => tag.name === SYSTEM_TAGS.ARCHIVED.name
-                        )
-                        const isWordFavoriteUpdating = wordFavoriteUpdatingIds.has(favoriteItem.wordId)
-                        const isWordArchiveUpdating = wordArchiveUpdatingIds.has(favoriteItem.wordId)
-                        const isWordNoteUpdating = wordNoteUpdatingIds.has(favoriteItem.wordId)
-                        const isWordNoteEditing = editingWordNoteId === favoriteItem.wordId
-                        const hasWordNote = !!favoriteItem.note?.trim()
-                        const wordVisibleTags = (favoriteItem.tags || []).filter(
-                          (tag) =>
-                            tag.name !== SYSTEM_TAGS.FAVORITE.name &&
-                            tag.name !== SYSTEM_TAGS.ARCHIVED.name
-                        )
-                        const hasCustomWordTag = wordVisibleTags.some(
-                          (tag) => tag.name !== SYSTEM_TAGS.ARCHIVED.name
-                        )
+            <>
+              <div className={`grid gap-3 ${displayMode === 'cn' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {paginatedFavorites.map((favoriteItem) => (
+                  <div
+                    key={`${getFavoriteItemEntityType(favoriteItem)}-${getFavoriteItemEntityId(favoriteItem)}`}
+                    className={`h-full relative transition-transform ${
+                      isSelectionMode && canUseSelectionMode ? 'cursor-pointer hover:scale-[1.01]' : ''
+                    }`}
+                    onClickCapture={
+                      isSelectionMode && canUseSelectionMode
+                        ? (event) => handleSelectionCardClickCapture(event, getFavoriteItemEntityId(favoriteItem))
+                        : undefined
+                    }
+                  >
+                    {isWordItem(favoriteItem) ? (
+                      <div className="h-full p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative">
+                        {(() => {
+                          const isWordFavorited = (favoriteItem.tags || []).some(
+                            (tag) => tag.name === SYSTEM_TAGS.FAVORITE.name
+                          )
+                          const isWordArchived = (favoriteItem.tags || []).some(
+                            (tag) => tag.name === SYSTEM_TAGS.ARCHIVED.name
+                          )
+                          const isWordFavoriteUpdating = wordFavoriteUpdatingIds.has(favoriteItem.wordId)
+                          const isWordArchiveUpdating = wordArchiveUpdatingIds.has(favoriteItem.wordId)
+                          const isWordNoteUpdating = wordNoteUpdatingIds.has(favoriteItem.wordId)
+                          const isWordNoteEditing = editingWordNoteId === favoriteItem.wordId
+                          const hasWordNote = !!favoriteItem.note?.trim()
+                          const wordVisibleTags = (favoriteItem.tags || []).filter(
+                            (tag) =>
+                              tag.name !== SYSTEM_TAGS.FAVORITE.name &&
+                              tag.name !== SYSTEM_TAGS.ARCHIVED.name
+                          )
+                          const hasCustomWordTag = wordVisibleTags.some(
+                            (tag) => tag.name !== SYSTEM_TAGS.ARCHIVED.name
+                          )
 
-                        return (
-                          <div className="flex h-full">
-                            <div className="flex-1 min-w-0 flex flex-col">
-                              <h3
-                                className="font-bold text-gray-900 text-lg cursor-pointer hover:text-teal-600 transition-colors mb-2"
-                                onClick={() => onWordSelect(favoriteItem.wordId)}
-                              >
-                                {favoriteItem.headword}
-                              </h3>
+                          return (
+                            <div className="flex h-full">
+                              <div className="flex-1 min-w-0 flex flex-col">
+                                <h3
+                                  className="font-bold text-gray-900 text-lg cursor-pointer hover:text-teal-600 transition-colors mb-2"
+                                  onClick={() => onWordSelect(favoriteItem.wordId)}
+                                >
+                                  {favoriteItem.headword}
+                                </h3>
 
-                              {isWordNoteEditing && (
-                                <div className="mb-3 text-sm">
-                                  <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
-                                    <textarea
-                                      className="w-full bg-transparent resize-none outline-none text-gray-700 min-h-[60px]"
-                                      value={wordNoteDraft}
-                                      onChange={(event) => setWordNoteDraft(event.target.value)}
-                                      placeholder="添加笔记..."
-                                      autoFocus
-                                      onClick={(event) => event.stopPropagation()}
-                                      onKeyDown={(event) => {
-                                        if (event.key === 'Enter' && !event.shiftKey) {
-                                          event.preventDefault()
-                                          saveWordNote(favoriteItem.wordId)
-                                        }
-                                      }}
-                                    />
-                                    <div className="flex justify-between items-center mt-2">
-                                      <button
-                                        onClick={(event) => {
-                                          event.stopPropagation()
-                                          setWordNoteDraft('')
-                                        }}
-                                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
-                                      >
-                                        清空
-                                      </button>
-                                      <div className="flex gap-2">
-                                        <button
-                                          onClick={(event) => {
-                                            event.stopPropagation()
-                                            cancelWordNoteEditing()
-                                          }}
-                                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-                                        >
-                                          取消
-                                        </button>
-                                        <button
-                                          onClick={(event) => {
-                                            event.stopPropagation()
+                                {isWordNoteEditing && (
+                                  <div className="mb-3 text-sm">
+                                    <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
+                                      <textarea
+                                        className="w-full bg-transparent resize-none outline-none text-gray-700 min-h-[60px]"
+                                        value={wordNoteDraft}
+                                        onChange={(event) => setWordNoteDraft(event.target.value)}
+                                        placeholder="添加笔记..."
+                                        autoFocus
+                                        onClick={(event) => event.stopPropagation()}
+                                        onKeyDown={(event) => {
+                                          if (event.key === 'Enter' && !event.shiftKey) {
+                                            event.preventDefault()
                                             saveWordNote(favoriteItem.wordId)
+                                          }
+                                        }}
+                                      />
+                                      <div className="flex justify-between items-center mt-2">
+                                        <button
+                                          onClick={(event) => {
+                                            event.stopPropagation()
+                                            setWordNoteDraft('')
                                           }}
-                                          disabled={isWordNoteUpdating}
-                                          className={`text-xs px-3 py-1 rounded ${
-                                            isWordNoteUpdating
-                                              ? 'bg-yellow-100 text-yellow-300 cursor-not-allowed'
-                                              : 'bg-yellow-200 hover:bg-yellow-300 text-yellow-800'
-                                          }`}
+                                          className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
                                         >
-                                          保存
+                                          清空
                                         </button>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={(event) => {
+                                              event.stopPropagation()
+                                              cancelWordNoteEditing()
+                                            }}
+                                            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                                          >
+                                            取消
+                                          </button>
+                                          <button
+                                            onClick={(event) => {
+                                              event.stopPropagation()
+                                              saveWordNote(favoriteItem.wordId)
+                                            }}
+                                            disabled={isWordNoteUpdating}
+                                            className={`text-xs px-3 py-1 rounded ${
+                                              isWordNoteUpdating
+                                                ? 'bg-yellow-100 text-yellow-300 cursor-not-allowed'
+                                                : 'bg-yellow-200 hover:bg-yellow-300 text-yellow-800'
+                                            }`}
+                                          >
+                                            保存
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
 
-                              <div className="flex flex-wrap gap-1 mt-auto">
-                                {wordVisibleTags.map((tag) => (
-                                  <span
-                                    key={tag.id}
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
+                                <div className="flex flex-wrap gap-1 mt-auto">
+                                  {wordVisibleTags.map((tag) => (
+                                    <span
+                                      key={tag.id}
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
+                                    >
+                                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                                        />
+                                      </svg>
+                                      {tag.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-1 ml-2">
+                                  <button
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation()
+                                      handleWordFavoriteToggle(favoriteItem.wordId, isWordFavorited)
+                                    }}
+                                    className={`favorite-btn ${
+                                      isWordFavorited ? 'active' : 'text-gray-300'
+                                    } ${isWordFavoriteUpdating ? 'opacity-60' : ''}`}
+                                    data-action-tooltip={isWordFavorited ? '取消收藏' : '收藏'}
+                                    aria-label={isWordFavorited ? '取消收藏' : '收藏'}
                                   >
-                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                      />
+                                    </svg>
+                                  </button>
+
+                                  <button
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation()
+                                      setWordTagSelectorState({
+                                        wordId: favoriteItem.wordId,
+                                        tags: favoriteItem.tags
+                                      })
+                                    }}
+                                    className={`favorite-btn ${
+                                      hasCustomWordTag
+                                        ? 'is-tag-active'
+                                        : 'text-gray-300'
+                                    }`}
+                                    data-action-tooltip="管理标签"
+                                    aria-label="管理标签"
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
                                       <path
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
@@ -1180,179 +1492,152 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
                                         d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                                       />
                                     </svg>
-                                    {tag.name}
-                                  </span>
-                                ))}
+                                  </button>
+
+                                  <button
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation()
+                                      handleWordArchiveToggle(favoriteItem.wordId, isWordArchived)
+                                    }}
+                                    className={`favorite-btn ${
+                                      isWordArchived
+                                        ? 'is-archive-active'
+                                        : 'text-gray-300'
+                                    } ${isWordArchiveUpdating ? 'opacity-60' : ''}`}
+                                    data-action-tooltip={isWordArchived ? '取消归档' : '归档'}
+                                    aria-label={isWordArchived ? '取消归档' : '归档'}
+                                  >
+                                    <ArchiveIcon className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation()
+                                      if (isWordNoteEditing) {
+                                        cancelWordNoteEditing()
+                                      } else {
+                                        startWordNoteEditing(favoriteItem.wordId, favoriteItem.note)
+                                      }
+                                    }}
+                                    className={`favorite-btn ${
+                                      hasWordNote || isWordNoteEditing
+                                        ? 'is-note-active'
+                                        : 'text-gray-300'
+                                    } ${isWordNoteUpdating ? 'opacity-60' : ''}`}
+                                    data-action-tooltip="添加/编辑笔记"
+                                    aria-label="添加/编辑笔记"
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                  </button>
                               </div>
                             </div>
+                          )
+                        })()}
+                      </div>
+                    ) : (
+                      <SenseCard
+                        sense={{
+                          id: favoriteItem.senseId,
+                          sense_index: favoriteItem.senseIndex,
+                          grammar: favoriteItem.grammar,
+                          definition: favoriteItem.definition,
+                          definition_cn: favoriteItem.definitionCn,
+                          examples: favoriteItem.examples || '[]',
+                          is_favorited: favoriteItem.isFavorited ? 1 : 0,
+                          tags: favoriteItem.tags || [],
+                          favorite_note: favoriteItem.note
+                        }}
+                        headword={favoriteItem.headword}
+                        pos={inferPos(favoriteItem.grammar, favoriteItem.senseGroup)}
+                        displayMode={displayMode}
+                        showHeadword={true}
+                        onFavoriteToggle={
+                          isSelectionMode ? () => {} : () => handleFavoriteToggle(favoriteItem.senseId)
+                        }
+                        onNoteChange={isSelectionMode ? undefined : handleNoteChange}
+                        onTagsChange={isSelectionMode ? undefined : () => loadFavorites(true)}
+                        onHeadwordClick={
+                          isSelectionMode ? undefined : () => onWordSelect(favoriteItem.wordId)
+                        }
+                      />
+                    )}
 
-                            {!isSelectionMode && (
-                              <div className="flex flex-col gap-1 ml-2">
-                                <button
-                                  onClick={(clickEvent) => {
-                                    clickEvent.stopPropagation()
-                                    handleWordFavoriteToggle(favoriteItem.wordId, isWordFavorited)
-                                  }}
-                                  className={`favorite-btn ${
-                                    isWordFavorited ? 'active' : 'text-gray-300'
-                                  } ${isWordFavoriteUpdating ? 'opacity-60' : ''}`}
-                                  title={isWordFavorited ? '取消收藏' : '收藏'}
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                                    />
-                                  </svg>
-                                </button>
-
-                                <button
-                                  onClick={(clickEvent) => {
-                                    clickEvent.stopPropagation()
-                                    setWordTagSelectorState({
-                                      wordId: favoriteItem.wordId,
-                                      tags: favoriteItem.tags
-                                    })
-                                  }}
-                                  className={`favorite-btn ${
-                                    hasCustomWordTag
-                                      ? 'is-tag-active'
-                                      : 'text-gray-300'
-                                  }`}
-                                  title="管理标签"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                                    />
-                                  </svg>
-                                </button>
-
-                                <button
-                                  onClick={(clickEvent) => {
-                                    clickEvent.stopPropagation()
-                                    handleWordArchiveToggle(favoriteItem.wordId, isWordArchived)
-                                  }}
-                                  className={`favorite-btn ${
-                                    isWordArchived
-                                      ? 'is-archive-active'
-                                      : 'text-gray-300'
-                                  } ${isWordArchiveUpdating ? 'opacity-60' : ''}`}
-                                  title={isWordArchived ? '取消归档' : '归档'}
-                                >
-                                  <ArchiveIcon className="w-4 h-4" />
-                                </button>
-
-                                <button
-                                  onClick={(clickEvent) => {
-                                    clickEvent.stopPropagation()
-                                    if (isWordNoteEditing) {
-                                      cancelWordNoteEditing()
-                                    } else {
-                                      startWordNoteEditing(favoriteItem.wordId, favoriteItem.note)
-                                    }
-                                  }}
-                                  className={`favorite-btn ${
-                                    hasWordNote || isWordNoteEditing
-                                      ? 'is-note-active'
-                                      : 'text-gray-300'
-                                  } ${isWordNoteUpdating ? 'opacity-60' : ''}`}
-                                  title="添加/编辑笔记"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  ) : (
-                    <SenseCard
-                      sense={{
-                        id: favoriteItem.senseId,
-                        sense_index: favoriteItem.senseIndex,
-                        grammar: favoriteItem.grammar,
-                        definition: favoriteItem.definition,
-                        definition_cn: favoriteItem.definitionCn,
-                        examples: favoriteItem.examples || '[]',
-                        is_favorited: favoriteItem.isFavorited ? 1 : 0,
-                        tags: favoriteItem.tags || [],
-                        favorite_note: favoriteItem.note
-                      }}
-                      headword={favoriteItem.headword}
-                      pos={inferPos(favoriteItem.grammar, favoriteItem.senseGroup)}
-                      displayMode={displayMode}
-                      showHeadword={true}
-                      onFavoriteToggle={
-                        isSelectionMode ? () => {} : () => handleFavoriteToggle(favoriteItem.senseId)
-                      }
-                      onNoteChange={isSelectionMode ? undefined : handleNoteChange}
-                      onTagsChange={isSelectionMode ? undefined : () => loadFavorites(true)}
-                      onHeadwordClick={
-                        isSelectionMode ? undefined : () => onWordSelect(favoriteItem.wordId)
-                      }
-                    />
-                  )}
-
-                  {isSelectionMode && canUseSelectionMode && (
-                    <div
-                      className={`absolute inset-0 rounded-lg border-2 pointer-events-none transition-colors ${
-                        selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem))
-                          ? 'border-blue-500 bg-blue-50/10'
-                          : 'border-transparent hover:bg-gray-50/20'
-                      }`}
-                    >
+                    {isSelectionMode && canUseSelectionMode && (
                       <div
-                        className={`absolute top-1 left-1 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        className={`absolute inset-0 rounded-lg border-2 pointer-events-none transition-colors ${
                           selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem))
-                            ? 'bg-blue-500 border-blue-500'
-                            : 'bg-white border-gray-300'
+                            ? 'border-blue-500 bg-blue-50/10'
+                            : 'border-transparent hover:bg-gray-50/20'
                         }`}
                       >
-                        {selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem)) && (
-                          <svg
-                            className="w-3 h-3 text-white"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
+                        <div
+                          className={`absolute top-1 left-1 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem))
+                              ? 'bg-blue-500 border-blue-500'
+                              : 'bg-white border-gray-300'
+                          }`}
+                        >
+                          {selectedEntityIds.has(getFavoriteItemEntityId(favoriteItem)) && (
+                            <svg
+                              className="w-3 h-3 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-4 flex justify-center border-t border-gray-100 pt-3 text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className={`rounded border px-3 py-1.5 transition-colors ${
+                        currentPage === 1
+                          ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      上一页
+                    </button>
+                    <span className="min-w-[5rem] text-center text-gray-600">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className={`rounded border px-3 py-1.5 transition-colors ${
+                        currentPage === totalPages
+                          ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      下一页
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
