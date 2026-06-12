@@ -12,6 +12,9 @@ const HTML_TAG_PATTERN = /<[^>]+>/g
 const HTML_ENTITY_PATTERN = /&(#\d+|#x[\da-f]+|[a-z][a-z\d]+);/gi
 const WHITESPACE_AROUND_NEWLINES_PATTERN = /[ \t]*\n[ \t]*/g
 const REPEATED_NEWLINES_PATTERN = /\n{3,}/g
+const LOCALIZED_RELEASE_HEADING_PATTERN = /^(?:#{1,6}\s*)?(中文|english)\s*#*\s*$/i
+
+export type ReleaseNotesLocale = 'zh-CN' | 'en-US'
 
 const HTML_ENTITY_MAP: Record<string, string> = {
   amp: '&',
@@ -85,16 +88,66 @@ function normalizeReleaseNoteText(releaseNoteText: string): string | null {
     : null
 }
 
-export function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string | null {
+function getReleaseNotesLocaleFromHeading(heading: string): ReleaseNotesLocale {
+  return heading.toLowerCase() === 'english' ? 'en-US' : 'zh-CN'
+}
+
+function selectLocalizedReleaseNoteText(
+  releaseNoteText: string,
+  locale: ReleaseNotesLocale
+): string | null {
+  const localizedSections: Record<ReleaseNotesLocale, string[]> = {
+    'zh-CN': [],
+    'en-US': []
+  }
+  let activeLocale: ReleaseNotesLocale | null = null
+  let hasLocalizedHeading = false
+
+  for (const line of releaseNoteText.split('\n')) {
+    const headingMatch = line.trim().match(LOCALIZED_RELEASE_HEADING_PATTERN)
+    if (headingMatch) {
+      hasLocalizedHeading = true
+      activeLocale = getReleaseNotesLocaleFromHeading(headingMatch[1])
+      continue
+    }
+
+    if (activeLocale) {
+      localizedSections[activeLocale].push(line)
+    }
+  }
+
+  if (!hasLocalizedHeading) {
+    return releaseNoteText
+  }
+
+  const localizedReleaseNotes = compactReleaseNotesText(localizedSections[locale].join('\n'))
+  return localizedReleaseNotes || null
+}
+
+function normalizeLocalizedReleaseNoteText(
+  releaseNoteText: string,
+  locale: ReleaseNotesLocale
+): string | null {
+  const normalizedReleaseNotes = normalizeReleaseNoteText(releaseNoteText)
+  return normalizedReleaseNotes
+    ? selectLocalizedReleaseNoteText(normalizedReleaseNotes, locale)
+    : null
+}
+
+export function normalizeReleaseNotes(
+  releaseNotes: UpdateInfo['releaseNotes'],
+  locale: ReleaseNotesLocale
+): string | null {
   if (typeof releaseNotes === 'string') {
-    return normalizeReleaseNoteText(releaseNotes)
+    return normalizeLocalizedReleaseNoteText(releaseNotes, locale)
   }
 
   if (Array.isArray(releaseNotes)) {
     const normalizedNotes = releaseNotes
       .map(({ version, note }) => {
-        const normalizedNote = typeof note === 'string' ? normalizeReleaseNoteText(note) : null
-        return [version, normalizedNote].filter(Boolean).join('\n').trim()
+        const normalizedNote =
+          typeof note === 'string' ? normalizeLocalizedReleaseNoteText(note, locale) : null
+        return normalizedNote ? [version, normalizedNote].filter(Boolean).join('\n').trim() : ''
       })
       .filter((note) => note.length > 0)
 

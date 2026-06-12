@@ -7,6 +7,7 @@ import SenseCard from './components/SenseCard'
 import TagSelector from './components/TagSelector'
 import WordPronunciation from './components/WordPronunciation'
 import { useSearchSuggestions } from './hooks/useSearchSuggestions'
+import { useLocalization } from './localization'
 import { useBodyScrollLock } from './utils/scrollLock'
 
 declare global {
@@ -347,6 +348,119 @@ const READING_GUIDE_SECTIONS: ReadonlyArray<ReadingGuideSection> = [
     items: [
       '将生单词的具体释义全部收藏为生词，纳入后续背词任务。',
       '将第五遍阅读时记录下来的语法现象也记到记忆软件中，后续和单词一起复习。'
+    ]
+  }
+] as const
+
+const ENGLISH_READING_GUIDE_INTRO: ReactNode = (
+  <>
+    Enter the English text in <ReadingGuideStepLink stepId="input">Input Text</ReadingGuideStepLink>, then click Next.
+  </>
+)
+
+const ENGLISH_READING_GUIDE_SECTIONS: ReadonlyArray<ReadingGuideSection> = [
+  {
+    id: 'firstPass',
+    title: 'First Pass',
+    summary: 'Read the whole text for the gist. Mark unknown words, but do not look them up yet.',
+    items: [
+      'Focus on the general meaning, just like casual reading.',
+      <>
+        In <ReadingGuideStepLink stepId="markWords">Mark New Words</ReadingGuideStepLink>, mark every unknown word and try to infer its meaning from context.
+      </>,
+      'Do not use the dictionary during the first pass.'
+    ]
+  },
+  {
+    id: 'afterFirstPass',
+    title: 'After the First Pass',
+    summary: (
+      <>
+        Go to <ReadingGuideStepLink stepId="lookup">Look Up Senses</ReadingGuideStepLink> and look up all marked words together.
+      </>
+    ),
+    items: [
+      'Look up all unknown words at once instead of interrupting reading with scattered lookups.',
+      'If a word has multiple senses, choose the one that fits the current context best.'
+    ]
+  },
+  {
+    id: 'secondPass',
+    title: 'Second Pass',
+    summary: (
+      <>
+        In <ReadingGuideStepLink stepId="shuffleCn">Shuffled Chinese Definitions</ReadingGuideStepLink>, recall each meaning first and use the shuffled list only when needed.
+      </>
+    ),
+    items: [
+      'If a sense chosen in the first pass does not fit the context, return to the previous step and correct it.',
+      'If you forget a word right after looking it up, try to recall it before searching the shuffled definitions.',
+      'That search itself strengthens the connection between the word and its meaning.'
+    ]
+  },
+  {
+    id: 'thirdPass',
+    title: 'Third Pass',
+    summary: 'Repeat the second-pass method to strengthen the link between words and meanings.',
+    items: [
+      'Use the same approach as the second pass.',
+      'Whenever a word becomes uncertain again, find it in the shuffled definitions; this retrieval is part of learning it.'
+    ]
+  },
+  {
+    id: 'fourthPass',
+    title: 'Fourth Pass',
+    summary: 'Shift your focus from unfamiliar words to sentence structure.',
+    items: [
+      'If a sentence is still unclear, the main obstacle is probably syntax rather than vocabulary.',
+      'Analyze the syntax of unclear sentences to work out their meaning.',
+      'If syntax analysis is still difficult, consult a grammar reference first.'
+    ]
+  },
+  {
+    id: 'fifthPass',
+    title: 'Fifth Pass',
+    summary: 'Study unresolved grammar systematically and record the patterns you encounter.',
+    items: [
+      'Use a grammar reference to fully understand the structure of the current sentence.',
+      'Record the grammar pattern together with its sentence.',
+      'If it is still unclear, ask someone with stronger English skills to explain it thoroughly.'
+    ]
+  },
+  {
+    id: 'sixthPass',
+    title: 'Sixth Pass',
+    summary: (
+      <>
+        Go to <ReadingGuideStepLink stepId="wordStudy">Word Study</ReadingGuideStepLink> and read the full text smoothly now that its words and sentences are clear.
+      </>
+    ),
+    items: [
+      'Read the article again from beginning to end.',
+      'Even if the reading is not perfectly smooth, you have now understood the full article.'
+    ]
+  },
+  {
+    id: 'seventhPass',
+    title: 'Seventh Pass',
+    summary: 'Read the whole text smoothly again, moving closer to direct comprehension.',
+    items: [
+      'Read it one final time; this pass should be smoother than the previous one.',
+      'With repetition, the brain gets faster at turning English into understandable information.',
+      'With enough practice, direct comprehension gradually becomes a real skill.'
+    ]
+  },
+  {
+    id: 'afterSeventhPass',
+    title: 'After the Seventh Pass',
+    summary: (
+      <>
+        Go to <ReadingGuideStepLink stepId="batch">Batch Actions</ReadingGuideStepLink> and add the vocabulary and grammar from this text to long-term review.
+      </>
+    ),
+    items: [
+      'Favorite the specific senses of new words and add them to later vocabulary review.',
+      'Add the grammar patterns recorded during the fifth pass to your memory system and review them with the vocabulary.'
     ]
   }
 ] as const
@@ -1387,7 +1501,7 @@ function ReadingStageHeader({
             onClick={onOpenGuide}
             className={guideButtonClassName}
           >
-            辅助精读法说明
+            精读说明
           </button>
 
           <button
@@ -1407,7 +1521,7 @@ function ReadingStageHeader({
             onClick={onOpenGuide}
             className={guideButtonClassName}
           >
-            辅助精读法说明
+            精读说明
           </button>
         </div>
 
@@ -1447,6 +1561,7 @@ function ReadingHistoryDrawer({
   onDelete: (recordId: string) => Promise<void> | void
 }) {
   useBodyScrollLock(isOpen)
+  const { translate } = useLocalization()
 
   if (!isOpen) {
     return null
@@ -1500,15 +1615,15 @@ function ReadingHistoryDrawer({
                         {stageLabel}
                       </span>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                        标记 {record.markedTokenEntries.length}
+                        {translate(`标记 ${record.markedTokenEntries.length}`)}
                       </span>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                        选义 {record.selectedSenseEntries.length}
+                        {translate(`选义 ${record.selectedSenseEntries.length}`)}
                       </span>
                     </div>
 
                     <div className="mt-3 text-xs leading-5 text-slate-400">
-                      最近阅读 {formatReadingHistoryTime(record.updatedAt)}
+                      {translate(`最近阅读 ${formatReadingHistoryTime(record.updatedAt)}`)}
                     </div>
 
                     <div className="mt-4 flex items-center justify-end gap-2">
@@ -1551,10 +1666,14 @@ function ReadingGuideDrawer({
   canNavigateStep: (stepId: ReadingFlowStepId) => boolean
 }) {
   useBodyScrollLock(isOpen)
+  const { locale } = useLocalization()
 
   if (!isOpen) {
     return null
   }
+
+  const guideIntro = locale === 'en-US' ? ENGLISH_READING_GUIDE_INTRO : READING_GUIDE_INTRO
+  const guideSections = locale === 'en-US' ? ENGLISH_READING_GUIDE_SECTIONS : READING_GUIDE_SECTIONS
 
   const handleGuideContentClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target
@@ -1601,9 +1720,23 @@ function ReadingGuideDrawer({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <div className="space-y-6" onClick={handleGuideContentClick}>
-            <p className="text-sm leading-6 text-slate-600">{READING_GUIDE_INTRO}</p>
+            <p className="text-sm leading-6 text-slate-500">
+              {locale === 'en-US'
+                ? 'Guided intensive reading is excerpted from '
+                : '辅助精读法节选自 '}
+              <a
+                href="https://sspai.com/series/77"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-blue-600 underline underline-offset-2 transition hover:text-blue-700"
+              >
+                {locale === 'en-US' ? 'English Self-Study Handbook' : '《英语自学手册》'}
+              </a>
+            </p>
 
-            {READING_GUIDE_SECTIONS.map((section) => {
+            <p className="text-sm leading-6 text-slate-600">{guideIntro}</p>
+
+            {guideSections.map((section) => {
               return (
                 <section key={section.id} className="border-b border-slate-100 pb-6 last:border-b-0 last:pb-0">
                   <h3 className="text-sm font-semibold text-slate-900">{section.title}</h3>
@@ -1632,6 +1765,7 @@ function ReadingGuideDrawer({
 
 export default function ReadingApp() {
   const { confirm, alert, DialogComponent } = useConfirmDialog()
+  const { translate } = useLocalization()
   const [readingStage, setReadingStage] = useState<ReadingStage>('input')
   const [draftText, setDraftText] = useState('')
   const [committedText, setCommittedText] = useState('')
@@ -2988,7 +3122,7 @@ export default function ReadingApp() {
               <div className="px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">本次已标记</h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  共 {markedTokenEntries.length} 项
+                  {translate(`共 ${markedTokenEntries.length} 项`)}
                 </p>
               </div>
 
@@ -3004,14 +3138,16 @@ export default function ReadingApp() {
                         key={entry.tokenId}
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                       >
-                        <div className="text-xs font-medium text-slate-400">单词 {index + 1}</div>
+                        <div className="text-xs font-medium text-slate-400">
+                          {translate(`单词 ${index + 1}`)}
+                        </div>
                         <div className="mt-2 text-base font-semibold text-slate-900">{entry.sourceLabel}</div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <div className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                             {getReadingEntryPositionLabel(entry)}
                           </div>
                           <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                            全文 {matchCountByToken.get(entry.normalizedToken) || 1} 处
+                            {translate(`全文 ${matchCountByToken.get(entry.normalizedToken) || 1} 处`)}
                           </div>
                         </div>
                       </div>
@@ -3102,7 +3238,7 @@ export default function ReadingApp() {
               <div className="px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">本次已标记</h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  共 {markedTokenEntries.length} 项
+                  {translate(`共 ${markedTokenEntries.length} 项`)}
                 </p>
               </div>
 
@@ -3148,7 +3284,7 @@ export default function ReadingApp() {
                               {getReadingEntryPositionLabel(entry)}
                             </div>
                             <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                              全文 {matchCountByToken.get(entry.normalizedToken) || 1} 处
+                              {translate(`全文 ${matchCountByToken.get(entry.normalizedToken) || 1} 处`)}
                             </div>
                           </div>
                         </button>
@@ -3505,7 +3641,7 @@ export default function ReadingApp() {
 
                 {lookupPanelState.status === 'empty' && !lookupRedirectTarget && (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm leading-6 text-slate-500">
-                    未找到 “{lookupPanelState.queryText || '当前词'}” 的可用词条。
+                    {translate(`未找到 “${lookupPanelState.queryText || '当前词'}” 的可用词条。`)}
                   </div>
                 )}
 
@@ -3705,7 +3841,7 @@ export default function ReadingApp() {
               <div className="px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">乱序中文释义</h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  共 {shuffledSenseEntries.length} 项
+                  {translate(`共 ${shuffledSenseEntries.length} 项`)}
                 </p>
               </div>
 
@@ -3721,7 +3857,9 @@ export default function ReadingApp() {
                         key={entry.tokenId}
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                       >
-                        <div className="text-xs font-medium text-slate-400">释义 {index + 1}</div>
+                        <div className="text-xs font-medium text-slate-400">
+                          {translate(`释义 ${index + 1}`)}
+                        </div>
                         <div className="mt-2 text-sm leading-7 text-slate-700">
                           {getShuffleCnDefinition(entry)}
                         </div>
@@ -3807,7 +3945,7 @@ export default function ReadingApp() {
               <div className="px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">标记过的单词</h2>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  共 {selectedSenseEntries.length} 项
+                  {translate(`共 ${selectedSenseEntries.length} 项`)}
                 </p>
               </div>
 
@@ -3823,14 +3961,16 @@ export default function ReadingApp() {
                         key={entry.tokenId}
                         className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                       >
-                        <div className="text-xs font-medium text-slate-400">单词 {index + 1}</div>
+                        <div className="text-xs font-medium text-slate-400">
+                          {translate(`单词 ${index + 1}`)}
+                        </div>
                         <div className="mt-2 text-base font-semibold text-slate-900">{entry.headword}</div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <div className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                             {entry.sourceLabel} · {getReadingEntryPositionLabel(entry)}
                           </div>
                           <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                            全文 {entry.matchCount} 处
+                            {translate(`全文 ${entry.matchCount} 处`)}
                           </div>
                         </div>
                       </div>
@@ -3917,7 +4057,7 @@ export default function ReadingApp() {
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">本次标记释义</h2>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      已选 {selectedBatchEntryIds.size} / 共 {selectedSenseEntries.length} 项
+                      {translate(`已选 ${selectedBatchEntryIds.size} / 共 ${selectedSenseEntries.length} 项`)}
                     </p>
                   </div>
 
@@ -3986,7 +4126,9 @@ export default function ReadingApp() {
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <div className="text-xs font-medium text-slate-400">释义 {index + 1}</div>
+                              <div className="text-xs font-medium text-slate-400">
+                                {translate(`释义 ${index + 1}`)}
+                              </div>
                               {entry.isFavorited && (
                                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-500">
                                   已收藏
@@ -4007,7 +4149,7 @@ export default function ReadingApp() {
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <div className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                                全文 {entry.matchCount} 处
+                                {translate(`全文 ${entry.matchCount} 处`)}
                               </div>
 
                               {getVisibleReadingTags(entry.tags).map((tag) => (

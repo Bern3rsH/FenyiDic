@@ -4,6 +4,7 @@ import OverflowActionMenu, { type OverflowActionMenuItem } from './OverflowActio
 import TagSelector from './TagSelector'
 import { SYSTEM_TAGS } from '../../shared/types'
 import ArchiveIcon from './ArchiveIcon'
+import { useLocalization } from '../localization'
 
 interface Example {
   en: string
@@ -405,6 +406,7 @@ function SenseCard({
   maxExamples,
   size = 'default'
 }: SenseCardProps) {
+  const { translate } = useLocalization()
   const [showExamples, setShowExamples] = useState(false)
   const [note, setNote] = useState('')
   const [isEditing, setIsEditing] = useState(false)
@@ -822,7 +824,9 @@ function SenseCard({
                       onClick={() => setShowExamples(true)}
                       className="mt-2 flex max-w-full items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
                     >
-                      <span className="min-w-0 truncate">展开更多例句 ({examples.length - maxExamples})</span>
+                      <span className="min-w-0 truncate">
+                        {translate(`展开更多例句 (${examples.length - maxExamples})`)}
+                      </span>
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>

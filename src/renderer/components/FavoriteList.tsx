@@ -9,6 +9,7 @@ import BatchTagDialog, { type BatchTagDialogMode } from './BatchTagDialog'
 import { SYSTEM_TAGS } from '../../shared/types'
 import type { EntityType, FavoriteListItem, FavoriteSenseItem, FavoriteWordItem, ImportItem, Tag } from '../../shared/types'
 import { entityCapabilities } from '../constants/entityCapabilities'
+import { useLocalization } from '../localization'
 
 function isIdiomGroup(senseGroup?: string): boolean {
   if (!senseGroup) return false
@@ -354,6 +355,7 @@ const mergeFavoriteItemsByEntity = <T extends FavoriteListItem>(favoriteItems: T
 }
 
 function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps) {
+  const { translate } = useLocalization()
   const [favorites, setFavorites] = useState<FavoriteListItem[]>([])
   const [allCustomSenseItems, setAllCustomSenseItems] = useState<FavoriteSenseItem[]>([])
   const [allCustomWordItems, setAllCustomWordItems] = useState<FavoriteWordItem[]>([])
@@ -1205,26 +1207,32 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
           <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={toggleSelectionMode}
+              data-localization-skip="true"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                 isSelectionMode
                   ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
-              {isSelectionMode ? '退出批量管理' : '批量管理'}
+              {translate(isSelectionMode ? '取消批量管理' : '批量管理')}
             </button>
 
             {isSelectionMode && (
               <div className="mt-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-500">已选择 {selectedEntityIds.size} 项</div>
+                  <div className="text-sm text-gray-500">
+                    {translate(`已选择 ${selectedEntityIds.size} 项`)}
+                  </div>
                   <button
                     onClick={handleSelectAll}
+                    data-localization-skip="true"
                     className="text-xs px-2.5 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                   >
-                    {selectedCurrentPageCount === paginatedFavorites.length && paginatedFavorites.length > 0
-                      ? '取消'
-                      : '全选'}
+                    {translate(
+                      selectedCurrentPageCount === paginatedFavorites.length && paginatedFavorites.length > 0
+                        ? '取消全选'
+                        : '全选'
+                    )}
                   </button>
                   <button
                     onClick={() => void handleExportSelected()}

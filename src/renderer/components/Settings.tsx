@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { SYSTEM_TAGS } from '../../shared/types'
 import type { ReviewMode, TagModeConfig } from '../../shared/types'
+import { SUPPORTED_APP_LOCALES, useLocalization, type AppLocale } from '../localization'
+import { useConfirmDialog } from './ConfirmDialog'
 
-type SettingSection = 'search' | 'review' | 'reading' | 'software'
+type SettingSection = 'search' | 'review' | 'reading' | 'general'
 type DefinitionDisplayMode = 'en' | 'cn' | 'both'
 
 interface SettingsProps {
@@ -37,7 +39,7 @@ const sectionDefinitions: Array<{
   { id: 'search', title: '查词设置', subtitle: '配置查词行为与释义显示' },
   { id: 'review', title: '复习设置', subtitle: '配置复习模式、发音与标签策略' },
   { id: 'reading', title: '阅读设置', subtitle: '配置辅助精读法阅读相关选项' },
-  { id: 'software', title: '软件更新', subtitle: '检查版本并前往下载页面' }
+  { id: 'general', title: '通用设置', subtitle: '配置界面语言、版本与应用行为' }
 ]
 
 const tagReviewModeOptions: Array<{ value: ReviewMode; label: string }> = [
@@ -52,6 +54,11 @@ const definitionDisplayModeOptions: Array<{ value: DefinitionDisplayMode; label:
   { value: 'en', label: '英文' },
   { value: 'cn', label: '中文' },
   { value: 'both', label: '双语' }
+]
+
+const appLanguageOptions: Array<{ value: AppLocale; labelKey: 'languageChinese' | 'languageEnglish' }> = [
+  { value: 'zh-CN', labelKey: 'languageChinese' },
+  { value: 'en-US', labelKey: 'languageEnglish' }
 ]
 
 function Settings({
@@ -77,6 +84,8 @@ function Settings({
   updateRequestStatus,
   onCheckForAppUpdate
 }: SettingsProps) {
+  const { locale, setLocale, t, translate } = useLocalization()
+  const { confirm, DialogComponent } = useConfirmDialog()
   const [activeSection, setActiveSection] = useState<SettingSection>('search')
   const [availableTagNames, setAvailableTagNames] = useState<string[]>([])
   const [openReviewConfigDropdownKey, setOpenReviewConfigDropdownKey] = useState<string | null>(null)
@@ -205,6 +214,26 @@ function Settings({
 
   const isUpdateActionRunning = updateRequestStatus !== 'idle'
   const updateButtonText = updateRequestStatus === 'checking' ? '检查中...' : '检查更新'
+
+  const handleAppLanguageChange = async (nextLocale: AppLocale) => {
+    if (nextLocale === locale) {
+      return
+    }
+
+    const shouldRelaunchApp = await confirm({
+      title: t('languageRestartTitle'),
+      message: t('languageRestartMessage'),
+      confirmText: t('languageRestartConfirm'),
+      cancelText: t('languageRestartCancel'),
+      type: 'warning'
+    })
+
+    if (!shouldRelaunchApp) {
+      return
+    }
+
+    await setLocale(nextLocale)
+  }
 
   return (
     <div className="w-full">
@@ -616,14 +645,50 @@ function Settings({
               </div>
             )}
 
-            {activeSection === 'software' && (
+            {activeSection === 'general' && (
               <div className="space-y-6">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">{t('settingsLanguageTitle')}</div>
+                      <div className="mt-1 text-sm text-gray-500">{t('settingsLanguageSubtitle')}</div>
+                    </div>
+
+                    <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
+                      {appLanguageOptions.map(({ value, labelKey }) => {
+                        const isSupportedLocale = SUPPORTED_APP_LOCALES.includes(value)
+
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              if (isSupportedLocale) {
+                                void handleAppLanguageChange(value)
+                              }
+                            }}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                              locale === value
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                          >
+                            {t(labelKey)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <div className="font-medium text-gray-900">检查软件更新</div>
                       <div className="mt-1 text-sm text-gray-500">
-                        当前版本 {appVersion || '读取中'}。点击后会检查发布源，有新版本时可前往 GitHub Releases 下载新版安装包。
+                        {translate(
+                          `当前版本 ${appVersion || '读取中'}。点击后会检查发布源，有新版本时可前往 GitHub Releases 下载新版安装包。`
+                        )}
                       </div>
                     </div>
 
@@ -646,6 +711,7 @@ function Settings({
           </section>
         </div>
       </div>
+      {DialogComponent}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import type { MenuItemConstructorOptions } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './database'
-import { registerIpcHandlers } from './ipc/handlers'
+import { getStoredAppLanguage, registerIpcHandlers } from './ipc/handlers'
 import { initMdd } from './services/mdd-service'
 
 import { autoUpdater } from 'electron-updater'
@@ -24,6 +24,25 @@ autoUpdater.fullChangelog = false
 
 const APP_DISPLAY_NAME = 'FenyiDic'
 const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/FenyiDic/releases/latest'
+const REVIEW_WINDOW_TITLES = {
+  'zh-CN': '单词复习',
+  'en-US': 'Word Review'
+} as const
+const READING_WINDOW_TITLES = {
+  'zh-CN': '辅助精读法阅读',
+  'en-US': 'Guided Intensive Reading'
+} as const
+const STARTUP_LOADING_PAINT_DELAY_MS = 50
+const STARTUP_LOADING_TEXT = {
+  'zh-CN': {
+    status: '应用正在启动',
+    message: '正在启动 FenyiDic...'
+  },
+  'en-US': {
+    status: 'App is starting',
+    message: 'Starting FenyiDic...'
+  }
+} as const
 
 app.setName(APP_DISPLAY_NAME)
 initializeTelemetry()
@@ -46,7 +65,7 @@ function normalizeUpdateInfo(info: UpdateInfo): AppUpdateInfo {
   return {
     version: info.version,
     releaseName: info.releaseName ?? null,
-    releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+    releaseNotes: normalizeReleaseNotes(info.releaseNotes, getStoredAppLanguage()),
     releaseDate: info.releaseDate ?? null
   }
 }
@@ -277,6 +296,96 @@ function getMainWindow(): BrowserWindow | undefined {
   })
 }
 
+function preserveWindowTitle(window: BrowserWindow, title: string): void {
+  window.setTitle(title)
+  window.webContents.on('page-title-updated', (event) => {
+    event.preventDefault()
+    window.setTitle(title)
+  })
+}
+
+function configureExternalLinks(window: BrowserWindow): void {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const externalUrl = new URL(url)
+      if (externalUrl.protocol === 'https:' || externalUrl.protocol === 'http:') {
+        void shell.openExternal(externalUrl.toString()).catch((error) => {
+          console.error('Failed to open external link:', error)
+        })
+      }
+    } catch (error) {
+      console.error('Invalid external link:', error)
+    }
+
+    return { action: 'deny' }
+  })
+}
+
+function getStartupLoadingDataUrl(): string {
+  const startupText = STARTUP_LOADING_TEXT[getStoredAppLanguage()]
+  const startupDocument = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${APP_DISPLAY_NAME}</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        cursor: wait;
+        user-select: none;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        color: #6b7280;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .startup-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .startup-spinner {
+        width: 32px;
+        height: 32px;
+        border: 2px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 9999px;
+        animation: startup-spin 0.8s linear infinite;
+      }
+      .startup-message {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      @keyframes startup-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="startup-loading" role="status" aria-live="polite" aria-label="${startupText.status}">
+      <div class="startup-spinner" aria-hidden="true"></div>
+      <div class="startup-message">${startupText.message}</div>
+    </main>
+  </body>
+</html>`
+
+  return `data:text/html;charset=UTF-8,${encodeURIComponent(startupDocument)}`
+}
+
+function waitForStartupLoadingPaint(): Promise<void> {
+  return new Promise((resolvePaint) => {
+    setTimeout(resolvePaint, STARTUP_LOADING_PAINT_DELAY_MS)
+  })
+}
+
 function getCenteredWindowBounds(
   width: number,
   height: number,
@@ -297,8 +406,10 @@ function getCenteredWindowBounds(
 // 创建复习窗口
 function createReviewWindow(anchorWindow?: BrowserWindow): void {
   const targetBounds = getCenteredWindowBounds(REVIEW_WINDOW_WIDTH, REVIEW_WINDOW_HEIGHT, anchorWindow)
+  const windowTitle = REVIEW_WINDOW_TITLES[getStoredAppLanguage()]
 
   if (reviewWindow && !reviewWindow.isDestroyed()) {
+    reviewWindow.setTitle(windowTitle)
     reviewWindow.setPosition(targetBounds.x, targetBounds.y)
     reviewWindow.setSize(REVIEW_WINDOW_WIDTH, REVIEW_WINDOW_HEIGHT)
     reviewWindow.focus()
@@ -316,11 +427,13 @@ function createReviewWindow(anchorWindow?: BrowserWindow): void {
     minimizable: false,
     maximizable: false,
     autoHideMenuBar: true,
+    title: windowTitle,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+  preserveWindowTitle(reviewWindow, windowTitle)
 
   reviewWindow.on('closed', () => {
     reviewWindow = null
@@ -337,6 +450,7 @@ function createReviewWindow(anchorWindow?: BrowserWindow): void {
 
 function createReadingWindow(anchorWindow?: BrowserWindow): void {
   const targetBounds = getCenteredWindowBounds(READING_WINDOW_WIDTH, READING_WINDOW_HEIGHT, anchorWindow)
+  const windowTitle = READING_WINDOW_TITLES[getStoredAppLanguage()]
 
   if (readingWindow && !readingWindow.isDestroyed()) {
     const readingWindowWebContents = readingWindow.webContents
@@ -354,6 +468,7 @@ function createReadingWindow(anchorWindow?: BrowserWindow): void {
 
       readingWindow.setPosition(targetBounds.x, targetBounds.y)
       readingWindow.setSize(READING_WINDOW_WIDTH, READING_WINDOW_HEIGHT)
+      readingWindow.setTitle(windowTitle)
       readingWindow.moveTop()
       readingWindow.focus()
       return
@@ -375,12 +490,14 @@ function createReadingWindow(anchorWindow?: BrowserWindow): void {
     minimizable: true,
     maximizable: true,
     autoHideMenuBar: true,
-    title: '辅助精读法阅读',
+    title: windowTitle,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+  preserveWindowTitle(readingWindow, windowTitle)
+  configureExternalLinks(readingWindow)
 
   readingWindow.on('closed', () => {
     readingWindow = null
@@ -395,7 +512,7 @@ function createReadingWindow(anchorWindow?: BrowserWindow): void {
   }
 }
 
-function createWindow(): void {
+function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -407,29 +524,48 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  mainWindow.once('ready-to-show', () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.show()
+    }
   })
 
-  // 当页面内容完全加载后，处理待处理的深层链接
-  mainWindow.webContents.on('did-finish-load', () => {
-    isMainWindowReady = true
-    processPendingDeepLink()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
+  configureExternalLinks(mainWindow)
 
   captureTelemetryEvent('window_opened', { window: 'main' })
 
+  return mainWindow
+}
+
+async function showStartupLoading(mainWindow: BrowserWindow): Promise<void> {
+  await mainWindow.loadURL(getStartupLoadingDataUrl())
+  if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    mainWindow.show()
+  }
+  await waitForStartupLoadingPaint()
+}
+
+async function loadMainRenderer(mainWindow: BrowserWindow): Promise<void> {
+  isMainWindowReady = false
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    await mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  if (mainWindow.isDestroyed()) {
+    return
+  }
+
+  isMainWindowReady = true
+  processPendingDeepLink()
+}
+
+function createWindow(): void {
+  const mainWindow = createMainWindow()
+  void loadMainRenderer(mainWindow).catch((error) => {
+    console.error('Failed to load main renderer:', error)
+  })
 }
 
 // macOS Open URL Handler
@@ -469,6 +605,10 @@ if (!gotTheLock) {
 
   try {
     console.log('Starting app initialization...')
+    console.log('Creating startup window...')
+    const mainWindow = createMainWindow()
+    await showStartupLoading(mainWindow)
+    console.log('Startup loading is visible.')
     
     // 初始化数据库
     console.log('Initializing database...')
@@ -500,10 +640,10 @@ if (!gotTheLock) {
     ipcMain.handle(IPC_CHANNELS.CHECK_APP_UPDATE, () => checkForManualAppUpdate())
     ipcMain.handle(IPC_CHANNELS.OPEN_LATEST_RELEASE_PAGE, () => openLatestReleasePage())
 
-    console.log('Creating window...')
-    createWindow()
+    console.log('Loading main renderer...')
+    await loadMainRenderer(mainWindow)
     captureTelemetryEvent('app_opened')
-    console.log('Window created.')
+    console.log('Main renderer loaded.')
   } catch (error) {
     console.error('Failed to initialize app:', error)
   }

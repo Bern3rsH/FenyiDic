@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { DictionaryImportProgress, DictionaryParserType } from '../../shared/types'
+import { useLocalization } from '../localization'
 import { captureTelemetryEvent } from '../telemetry'
 
 interface DictionarySetupProps {
   onComplete: () => void
 }
 
-const OXFORD_DICTIONARY_DOWNLOAD_URL =
+const OXFORD_DICTIONARY_GOOGLE_DRIVE_URL =
   'https://drive.google.com/file/d/1R9DM3QP9mBaLhnQ2bCrCUp_UJdLgp90l/view?usp=sharing'
+const OXFORD_DICTIONARY_BAIDU_NETDISK_URL =
+  'https://pan.baidu.com/s/1vVwRSmCW9QLrc5wipwitGw?pwd=nzuf'
 
 export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
+  const { translate } = useLocalization()
   const [mdxPath, setMdxPath] = useState<string | null>(null)
   const [mddPaths, setMddPaths] = useState<string[]>([])
   const [parserType] = useState<DictionaryParserType>('default')
@@ -104,14 +108,24 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
           <p className="mt-3 text-xs leading-5 text-gray-500">
             为规避版权问题，请自行下载下面的牛津双解词典文件后导入，且目前应用只支持此 MDX
             词典文件，暂不支持别的 MDX 词典文件：
-            <a
-              href={OXFORD_DICTIONARY_DOWNLOAD_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="block mt-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
-            >
-              下载牛津双解词典文件
-            </a>
+            <span className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1">
+              <a
+                href={OXFORD_DICTIONARY_GOOGLE_DRIVE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+              >
+                Google Drive
+              </a>
+              <a
+                href={OXFORD_DICTIONARY_BAIDU_NETDISK_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+              >
+                {translate('百度网盘')}
+              </a>
+            </span>
           </p>
         </div>
 
@@ -184,7 +198,9 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
                     <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-gray-800">{mddPaths.length} 个文件已选择</span>
+                    <span className="text-gray-800">
+                      {translate(`${mddPaths.length} 个文件已选择`)}
+                    </span>
                   </>
                 ) : (
                   <>

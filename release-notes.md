@@ -69,3 +69,17 @@
 - 功能：优化了导入功能，支持本软件导出的文件进行导入，方便数据迁移
 - 功能：批量管理功能进行 UI 优化
 - 功能：我的列表页面增加了分页功能，提升了加载性能
+
+## v1.2.0
+
+### 中文
+
+- 功能：增加了对于英文的支持，用户可以选择使用英文界面
+- 功能：增加了全局启动 Loading
+- 优化：优化了词典下载入口，增加百度网盘的下载链接
+
+### English
+
+- Feature: Added support for English interface, allowing users to switch to English mode
+- Feature: Added global loading indicator during app startup
+- Improvement: Improved dictionary download entry with additional Baidu NetDisk download links

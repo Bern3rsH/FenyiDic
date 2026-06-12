@@ -8,6 +8,7 @@ import type { TagModeConfig } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
 import { getDefaultTagModeConfigs, normalizeTagModeConfigs } from './utils/tagModeConfigs'
 import { captureTelemetryEvent } from './telemetry'
+import { useLocalization } from './localization'
 
 declare global {
   interface Window {
@@ -30,8 +31,28 @@ const SEARCH_PAGE_INPUT_TOP_RATIO = 0.38
 const SEARCH_PAGE_MIN_TOP_PADDING_PX = 24
 const HEADER_HEIGHT_FALLBACK_PX = 88
 const EMPTY_RELEASE_NOTES_MESSAGE = '本次发布未填写更新内容。'
+const DEV_STARTUP_LOADING_PREVIEW_MS = 3000
 
 type UpdateRequestStatus = 'idle' | 'checking'
+
+function AppStartupLoading() {
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex h-screen w-screen cursor-wait select-none items-center justify-center bg-white"
+      role="status"
+      aria-live="polite"
+      aria-label="应用正在启动"
+    >
+      <div className="flex flex-col items-center gap-4 text-gray-500">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500"
+          aria-hidden="true"
+        />
+        <div className="text-sm font-medium">正在启动 FenyiDic...</div>
+      </div>
+    </div>
+  )
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -51,9 +72,11 @@ function formatReleaseNotesForDialog(releaseNotes: string | null | undefined): s
 }
 
 function App() {
+  const { t, translate } = useLocalization()
   // 词典状态
   const [hasDictionary, setHasDictionary] = useState<boolean | null>(null)
   const [showDevDictionarySetup, setShowDevDictionarySetup] = useState(false)
+  const [showDevStartupLoading, setShowDevStartupLoading] = useState(false)
   
   const [view, setView] = useState<View>('search')
   const [selectedWordId, setSelectedWordId] = useState<number | null>(null)
@@ -88,20 +111,46 @@ function App() {
   const headerRef = useRef<HTMLElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(HEADER_HEIGHT_FALLBACK_PX)
   const updateRequestStatusRef = useRef<UpdateRequestStatus>('idle')
+  const devStartupLoadingTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     updateRequestStatusRef.current = updateRequestStatus
   }, [updateRequestStatus])
 
+  useEffect(() => {
+    return () => {
+      if (devStartupLoadingTimerRef.current !== null) {
+        window.clearTimeout(devStartupLoadingTimerRef.current)
+      }
+    }
+  }, [])
+
   // 检查词典状态
   useEffect(() => {
-    window.api.checkDictionary().then((status) => {
-      setHasDictionary(status.hasActiveDictionary)
-      captureTelemetryEvent('feature_used', {
-        feature: 'dictionary_check',
-        has_dictionary: status.hasActiveDictionary
+    let isEffectActive = true
+
+    window.api.checkDictionary()
+      .then((status) => {
+        if (!isEffectActive) {
+          return
+        }
+
+        setHasDictionary(status.hasActiveDictionary)
+        captureTelemetryEvent('feature_used', {
+          feature: 'dictionary_check',
+          has_dictionary: status.hasActiveDictionary
+        })
       })
-    })
+      .catch((error) => {
+        console.error('Failed to check dictionary status', error)
+        if (isEffectActive) {
+          setHasDictionary(false)
+        }
+      })
+
+    return () => {
+      isEffectActive = false
+    }
   }, [])
 
   const handleCheckForAppUpdate = useCallback(async () => {
@@ -121,8 +170,8 @@ function App() {
 
       if (updateCheckResult.status === 'unsupported') {
         await alert({
-          title: '当前环境无法检查更新',
-          message: updateCheckResult.reason,
+          title: translate('当前环境无法检查更新'),
+          message: translate(updateCheckResult.reason),
           type: 'warning'
         })
         return
@@ -130,8 +179,8 @@ function App() {
 
       if (updateCheckResult.status === 'error') {
         await alert({
-          title: '检查更新失败',
-          message: updateCheckResult.error,
+          title: translate('检查更新失败'),
+          message: translate(updateCheckResult.error),
           type: 'danger'
         })
         return
@@ -139,30 +188,32 @@ function App() {
 
       if (updateCheckResult.status === 'not-available') {
         await alert({
-          title: '已是最新版本',
-          message: `当前版本 ${updateCheckResult.currentVersion} 已是最新版本。`,
+          title: translate('已是最新版本'),
+          message: t('updateAlreadyLatest', { version: updateCheckResult.currentVersion }),
           type: 'success'
         })
         return
       }
 
-      const releaseNotes = formatReleaseNotesForDialog(updateCheckResult.updateInfo.releaseNotes)
+      const releaseNotes = translate(formatReleaseNotesForDialog(updateCheckResult.updateInfo.releaseNotes))
       const updateMessage = [
-        `当前版本：${updateCheckResult.currentVersion}`,
-        `最新版本：${updateCheckResult.updateInfo.version}`,
-        updateCheckResult.updateInfo.releaseName ? `版本名称：${updateCheckResult.updateInfo.releaseName}` : null,
-        `本次更新内容：\n${releaseNotes}`,
-        '是否前往 GitHub Releases 下载新版安装包？',
-        '（每次安装完后都需要去系统设置中的隐私与安全性中点击“仍要打开”）'
+        t('updateCurrentVersion', { version: updateCheckResult.currentVersion }),
+        t('updateLatestVersion', { version: updateCheckResult.updateInfo.version }),
+        updateCheckResult.updateInfo.releaseName
+          ? t('updateReleaseName', { name: updateCheckResult.updateInfo.releaseName })
+          : null,
+        t('updateReleaseNotesTitle', { notes: releaseNotes }),
+        t('updateOpenReleasePageQuestion'),
+        t('updateMacPrivacyHint')
       ]
         .filter(Boolean)
         .join('\n\n')
 
       const shouldOpenReleasePage = await confirm({
-        title: '发现新版本',
+        title: translate('发现新版本'),
         message: updateMessage,
-        confirmText: '前往下载',
-        cancelText: '稍后',
+        confirmText: translate('前往下载'),
+        cancelText: translate('稍后'),
         type: 'info'
       })
 
@@ -177,22 +228,22 @@ function App() {
       })
       if (!openReleasePageResult.success) {
         await alert({
-          title: '打开下载页面失败',
-          message: openReleasePageResult.error || '无法打开 GitHub Releases 页面，请稍后再试。',
+          title: translate('打开下载页面失败'),
+          message: translate(openReleasePageResult.error || '无法打开 GitHub Releases 页面，请稍后再试。'),
           type: 'danger'
         })
       }
     } catch (error) {
       await alert({
-        title: '检查更新失败',
-        message: getErrorMessage(error),
+        title: translate('检查更新失败'),
+        message: translate(getErrorMessage(error)),
         type: 'danger'
       })
     } finally {
       updateRequestStatusRef.current = 'idle'
       setUpdateRequestStatus('idle')
     }
-  }, [alert, confirm])
+  }, [alert, confirm, t, translate])
 
   useEffect(() => {
     const headerElement = headerRef.current
@@ -252,6 +303,8 @@ function App() {
   
   // 从 electron-store 加载设置
   useEffect(() => {
+    let isEffectActive = true
+
     Promise.all([
       window.api.getSetting<DisplayMode>('displayMode'),
       window.api.getSetting<boolean>('reviewAutoPlay'),
@@ -263,8 +316,8 @@ function App() {
       window.api.getSetting<DisplayMode>('readingDisplayMode'),
       window.api.getSetting<boolean>('readingAutoPlay'),
       window.api.getSetting<'uk' | 'us'>('readingAutoPlayAccent')
-    ]).then(
-      ([
+    ])
+      .then(([
         mode,
         autoPlay,
         accent,
@@ -276,6 +329,10 @@ function App() {
         readingAP,
         readingAPAccent
       ]) => {
+        if (!isEffectActive) {
+          return
+        }
+
         if (mode) setDisplayMode(mode)
         if (autoPlay !== null && autoPlay !== undefined) setReviewAutoPlay(autoPlay)
         if (accent) setReviewAutoPlayAccent(accent)
@@ -290,8 +347,17 @@ function App() {
           normalizedTagModeConfigs.length > 0 ? normalizedTagModeConfigs : getDefaultTagModeConfigs()
         )
         setDisplayModeLoaded(true)
-      }
-    )
+      })
+      .catch((error) => {
+        console.error('Failed to load settings', error)
+        if (isEffectActive) {
+          setDisplayModeLoaded(true)
+        }
+      })
+
+    return () => {
+      isEffectActive = false
+    }
   }, [])
   
   // 当设置变化时保存到 electron-store
@@ -467,6 +533,17 @@ function App() {
     }`
   const devFloatingButtonBaseClass =
     'rounded-full border px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur transition-colors'
+  const previewDevStartupLoading = () => {
+    if (devStartupLoadingTimerRef.current !== null) {
+      window.clearTimeout(devStartupLoadingTimerRef.current)
+    }
+
+    setShowDevStartupLoading(true)
+    devStartupLoadingTimerRef.current = window.setTimeout(() => {
+      setShowDevStartupLoading(false)
+      devStartupLoadingTimerRef.current = null
+    }, DEV_STARTUP_LOADING_PREVIEW_MS)
+  }
   const devTools = import.meta.env.DEV ? (
     <div className="fixed bottom-4 right-4 z-50 flex flex-wrap justify-end gap-2">
       <button
@@ -481,6 +558,13 @@ function App() {
         {showDevDictionarySetup ? '返回应用' : '导入流程'}
       </button>
       <button
+        onClick={previewDevStartupLoading}
+        className={`${devFloatingButtonBaseClass} border-gray-200 bg-white/95 text-gray-600 hover:bg-gray-50`}
+        title="开发模式：预览应用启动 Loading"
+      >
+        预览 Loading
+      </button>
+      <button
         onClick={() => setReviewDebugNoFsrs((prev) => !prev)}
         className={`${devFloatingButtonBaseClass} ${
           reviewDebugNoFsrs
@@ -489,7 +573,7 @@ function App() {
         }`}
         title="开发模式：开启后复习结果不会写入 FSRS"
       >
-        调试FSRS: {reviewDebugNoFsrs ? '不写入' : '正常'}
+        {translate(`调试FSRS: ${reviewDebugNoFsrs ? '不写入' : '正常'}`)}
       </button>
     </div>
   ) : null
@@ -501,13 +585,10 @@ function App() {
     window.location.reload()
   }
 
-  // 加载中
-  if (hasDictionary === null) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    )
+  const isStartupLoading = hasDictionary === null || !displayModeLoaded
+
+  if (isStartupLoading || showDevStartupLoading) {
+    return <AppStartupLoading />
   }
 
   // 无词典，显示导入页面

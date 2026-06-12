@@ -141,7 +141,9 @@ export default function Sidebar({
             }`}
           >
             释义
-            <span className="ml-1 text-xs opacity-70">{entityCounts.sense}</span>
+            <span data-localization-skip="true" className="ml-1 text-xs opacity-70">
+              {entityCounts.sense}
+            </span>
           </button>
           <button
             onClick={() => onTabChange('word')}
@@ -152,7 +154,9 @@ export default function Sidebar({
             }`}
           >
             词条
-            <span className="ml-1 text-xs opacity-70">{entityCounts.word}</span>
+            <span data-localization-skip="true" className="ml-1 text-xs opacity-70">
+              {entityCounts.word}
+            </span>
           </button>
         </div>
       </div>
@@ -182,7 +186,12 @@ export default function Sidebar({
             </svg>
             <span>全部条目</span>
           </div>
-          <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full">{stats.total}</span>
+          <span
+            data-localization-skip="true"
+            className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full"
+          >
+            {stats.total}
+          </span>
         </button>
       </div>
 
@@ -212,7 +221,12 @@ export default function Sidebar({
               </svg>
               <span>收藏</span>
             </div>
-            <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full">{stats.favCount}</span>
+            <span
+              data-localization-skip="true"
+              className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full"
+            >
+              {stats.favCount}
+            </span>
           </button>
 
           <button
@@ -239,7 +253,12 @@ export default function Sidebar({
               </svg>
               <span>笔记</span>
             </div>
-            <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full">{stats.noteCount}</span>
+            <span
+              data-localization-skip="true"
+              className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full"
+            >
+              {stats.noteCount}
+            </span>
           </button>
 
           {archivedTag && (
@@ -255,7 +274,10 @@ export default function Sidebar({
                 <ArchiveIcon className="w-4 h-4" />
                 <span>归档</span>
               </div>
-              <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full">
+              <span
+                data-localization-skip="true"
+                className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full"
+              >
                 {stats.tagCounts[archivedTag.id] || 0}
               </span>
             </button>
@@ -285,7 +307,12 @@ export default function Sidebar({
               </svg>
               <span>手动录入</span>
             </div>
-            <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full">{stats.manualEntryCount}</span>
+            <span
+              data-localization-skip="true"
+              className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full"
+            >
+              {stats.manualEntryCount}
+            </span>
           </button>
         </div>
 
@@ -333,7 +360,12 @@ export default function Sidebar({
                       <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isSelected ? 'bg-blue-500' : 'bg-gray-300'}`} />
                       <span className="break-all whitespace-normal leading-5">{tag.name}</span>
                     </div>
-                    <span className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full ml-2 mt-0.5 flex-shrink-0">{count}</span>
+                    <span
+                      data-localization-skip="true"
+                      className="text-xs opacity-60 bg-white/50 px-1.5 rounded-full ml-2 mt-0.5 flex-shrink-0"
+                    >
+                      {count}
+                    </span>
                   </button>
                 )
               })
@@ -355,11 +387,11 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onImportInfo}
-            className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-gray-400 bg-white text-[11px] font-semibold leading-none text-gray-500 transition-colors hover:border-gray-500 hover:bg-gray-50 hover:text-gray-700"
+            className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border border-gray-600 bg-white text-[10px] font-semibold leading-none text-gray-600 transition-colors hover:bg-gray-50"
             aria-label="查看 CSV 导入字段说明"
             title="查看 CSV 导入字段说明"
           >
-            i
+            <span>i</span>
           </button>
         </div>
       </div>

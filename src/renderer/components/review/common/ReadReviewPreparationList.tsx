@@ -1,3 +1,5 @@
+import { useLocalization } from '../../../localization'
+
 interface ReadPreparationListItem {
   key: string
   headword: string
@@ -24,6 +26,7 @@ export default function ReadReviewPreparationList({
   onClearSelection,
   onStartReview
 }: ReadReviewPreparationListProps) {
+  const { translate } = useLocalization()
   const selectedCount = selectedKeys.size
   const remainingTotalCount = items.length - selectedCount + nonReadItemCount
 
@@ -46,7 +49,7 @@ export default function ReadReviewPreparationList({
             onClick={onStartReview}
             className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:translate-y-px"
           >
-            开始复习（剩余 {remainingTotalCount} 张）
+            {translate(`开始复习（剩余 ${remainingTotalCount} 张）`)}
           </button>
         </div>
 

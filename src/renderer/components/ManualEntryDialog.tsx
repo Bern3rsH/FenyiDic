@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CreateCustomEntryExample } from '../../shared/types'
 import { ConfirmDialog } from './ConfirmDialog'
+import { useLocalization } from '../localization'
 import { useBodyScrollLock } from '../utils/scrollLock'
 
 type ManualEntryDialogMode = 'create' | 'edit'
@@ -90,6 +91,7 @@ export default function ManualEntryDialog({
   onClose,
   onCompleted
 }: ManualEntryDialogProps) {
+  const { translate } = useLocalization()
   const [headword, setHeadword] = useState('')
   const [definitionCn, setDefinitionCn] = useState('')
   const [note, setNote] = useState('')
@@ -313,7 +315,9 @@ export default function ManualEntryDialog({
                 {examples.map((example, index) => (
                   <div key={example.id} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">第 {index + 1} 句</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        {translate(`第 ${index + 1} 句`)}
+                      </span>
                       {examples.length > 1 && (
                         <button
                           type="button"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { SearchResultItem } from '../../shared/types'
 import { useSearchSuggestions } from '../hooks/useSearchSuggestions'
+import { useLocalization } from '../localization'
 import ManualEntryDialog from './ManualEntryDialog'
 
 interface SearchBarProps {
@@ -27,6 +28,7 @@ function buildManualEntryPreview(query: string): string {
 }
 
 function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: SearchBarProps) {
+  const { locale, translate } = useLocalization()
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [isNavDropdownOpen, setIsNavDropdownOpen] = useState(false)
   const [isManualEntryDialogOpen, setIsManualEntryDialogOpen] = useState(false)
@@ -149,7 +151,9 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
     <div ref={containerRef} className="relative">
       {!isNavVariant && (
         <div className="pointer-events-none absolute inset-x-0 -top-16 text-center">
-          <h2 className="text-4xl font-semibold tracking-wide text-gray-800">FenyiDic 分义词典</h2>
+          <h2 className="text-4xl font-semibold tracking-wide text-gray-800">
+            {locale === 'en-US' ? 'FenyiDic' : 'FenyiDic 分义词典'}
+          </h2>
         </div>
       )}
 
@@ -188,7 +192,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                 onClick={openManualEntryDialog}
                 className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-gray-500 transition hover:bg-blue-50 hover:text-blue-700"
               >
-                <span>没有想要的？手动录入「{manualEntryPreview}」</span>
+                <span>{translate(`没有想要的？手动录入「${manualEntryPreview}」`)}</span>
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
                 </svg>
@@ -216,7 +220,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
                 </svg>
-                <span>词典里没有？手动录入「{manualEntryPreview}」</span>
+                <span>{translate(`词典里没有？手动录入「${manualEntryPreview}」`)}</span>
               </button>
             </div>
           )}
@@ -281,7 +285,9 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
                   className="flex w-full items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-100"
                 >
                   <div>
-                    <div className="text-sm font-medium text-blue-700">词典里没有？手动录入「{manualEntryPreview}」</div>
+                    <div className="text-sm font-medium text-blue-700">
+                      {translate(`词典里没有？手动录入「${manualEntryPreview}」`)}
+                    </div>
                     <div className="mt-0.5 text-xs text-blue-600/80">适合词典里没有的短语、句子或自定义释义</div>
                   </div>
                   <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +304,9 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
               className="flex w-full items-center justify-between border-t border-gray-100 px-4 py-3 text-left text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-700"
             >
               <div>
-                <div className="text-sm font-medium">没有想要的？手动录入「{manualEntryPreview}」</div>
+                <div className="text-sm font-medium">
+                  {translate(`没有想要的？手动录入「${manualEntryPreview}」`)}
+                </div>
                 <div className="mt-0.5 text-xs text-gray-400">适合词典里没有的短语、句子或自定义释义</div>
               </div>
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useBodyScrollLock } from '../utils/scrollLock'
+import { useLocalization } from '../localization'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -24,6 +25,7 @@ export function ConfirmDialog({
   type = 'info',
   alertMode = false
 }: ConfirmDialogProps) {
+  const { translate } = useLocalization()
   const dialogRef = useRef<HTMLDivElement>(null)
   useBodyScrollLock(isOpen)
 
@@ -85,12 +87,12 @@ export function ConfirmDialog({
         {/* 标题 */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
           {iconByType[type]}
-          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{translate(title)}</h3>
         </div>
         
         {/* 内容 */}
         <div className="px-6 py-5 overflow-y-auto">
-          <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{message}</p>
+          <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{translate(message)}</p>
         </div>
         
         {/* 按钮 */}
@@ -100,14 +102,14 @@ export function ConfirmDialog({
               onClick={onCancel}
               className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
-              {cancelText}
+              {translate(cancelText)}
             </button>
           )}
           <button
             onClick={onConfirm}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${buttonStyles[type]}`}
           >
-            {confirmText}
+            {translate(confirmText)}
           </button>
         </div>
       </div>
@@ -145,12 +147,13 @@ interface DialogState {
 }
 
 export function useConfirmDialog() {
+  const { translate } = useLocalization()
   const [state, setState] = useState<DialogState>({
     isOpen: false,
-    title: '确认',
+    title: translate('确认'),
     message: '',
-    confirmText: '确认',
-    cancelText: '取消',
+    confirmText: translate('确认'),
+    cancelText: translate('取消'),
     type: 'info',
     alertMode: false,
     resolve: null
@@ -166,16 +169,16 @@ export function useConfirmDialog() {
     return new Promise((resolve) => {
       setState({
         isOpen: true,
-        title: options.title || '确认',
+        title: options.title || translate('确认'),
         message: options.message,
-        confirmText: options.confirmText || '确认',
-        cancelText: options.cancelText || '取消',
+        confirmText: options.confirmText || translate('确认'),
+        cancelText: options.cancelText || translate('取消'),
         type: options.type || 'info',
         alertMode: false,
         resolve
       })
     })
-  }, [])
+  }, [translate])
 
   // 纯通知弹窗（只有确定按钮）
   const alert = useCallback((options: {
@@ -187,16 +190,16 @@ export function useConfirmDialog() {
     return new Promise((resolve) => {
       setState({
         isOpen: true,
-        title: options.title || '提示',
+        title: options.title || translate('提示'),
         message: options.message,
-        confirmText: options.confirmText || '好的',
+        confirmText: options.confirmText || translate('好的'),
         cancelText: '',
         type: options.type || 'info',
         alertMode: true,
         resolve: () => resolve()
       })
     })
-  }, [])
+  }, [translate])
 
   const handleConfirm = useCallback(() => {
     state.resolve?.(true)

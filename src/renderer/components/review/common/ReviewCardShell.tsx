@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import ArchiveIcon from '../../ArchiveIcon'
+import { useLocalization } from '../../../localization'
 
 interface ReviewCardShellProps {
   axisType: 'sense' | 'word'
@@ -32,6 +33,7 @@ export default function ReviewCardShell({
   onFuzzy,
   onDontKnow
 }: ReviewCardShellProps) {
+  const { translate } = useLocalization()
   const axisLabel = axisType === 'sense' ? '释义' : '词条'
   const axisBadgeClassName =
     axisType === 'sense'
@@ -73,7 +75,9 @@ export default function ReviewCardShell({
             </span>
             {axisSubtitle && <span className="text-xs text-gray-500">{axisSubtitle}</span>}
           </div>
-          {!isFlipped ? frontContent : backContent}
+          <div className="flex min-h-0 flex-1 flex-col pt-12">
+            {!isFlipped ? frontContent : backContent}
+          </div>
         </div>
       </div>
 
@@ -83,7 +87,7 @@ export default function ReviewCardShell({
             onClick={onFlip}
             className="px-8 py-3 rounded-xl bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors shadow-md"
           >
-            展示答案 {returnKeyLabel}
+            {translate(`展示答案 ${returnKeyLabel}`)}
           </button>
         ) : (
           <>

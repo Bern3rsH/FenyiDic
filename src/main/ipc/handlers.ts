@@ -1,4 +1,5 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { app, ipcMain, dialog, BrowserWindow } from 'electron'
+import { spawn } from 'child_process'
 import { getDatabase, reinitDatabase } from '../database'
 import {
   IPC_CHANNELS,
@@ -38,6 +39,7 @@ import { captureTelemetryEvent } from '../telemetry'
 
 // 用户设置存储
 interface StoreSchema {
+  appLanguage: 'zh-CN' | 'en-US'
   displayMode: 'en' | 'cn' | 'both'
   reviewAutoPlay: boolean
   reviewAutoPlayAccent: 'uk' | 'us'
@@ -50,6 +52,7 @@ interface StoreSchema {
 
 const store = new Store<StoreSchema>({
   defaults: {
+    appLanguage: 'zh-CN',
     displayMode: 'both',
     reviewAutoPlay: false,
     reviewAutoPlayAccent: 'uk',
@@ -63,6 +66,9 @@ const store = new Store<StoreSchema>({
 
 import { ttsService } from '../services/TtsService'
 
+const APP_LANGUAGE_SETTING_KEY = 'appLanguage'
+const APP_LANGUAGE_VALUES = new Set(['zh-CN', 'en-US'])
+const DEVELOPMENT_RESTART_SCRIPT = 'dev'
 const CUSTOM_SEARCH_SOURCE_LABEL = '手动'
 const DICTIONARY_SEARCH_SOURCE_LABEL = '词典'
 const DIRECT_REDIRECT_PREFIX = '@@@LINK='
@@ -71,6 +77,57 @@ const MAX_CUSTOM_NOTE_LENGTH = 2000
 const MAX_CUSTOM_DEFINITION_CN_LENGTH = 4000
 const MAX_CUSTOM_EXAMPLE_EN_LENGTH = 1000
 const MAX_CUSTOM_EXAMPLE_CN_LENGTH = 2000
+
+export function getStoredAppLanguage(): StoreSchema['appLanguage'] {
+  return store.get(APP_LANGUAGE_SETTING_KEY)
+}
+
+function restartAppAfterSettingChange(): void {
+  try {
+    if (!app.isPackaged) {
+      app.releaseSingleInstanceLock()
+      const npmExecPath = process.env.npm_execpath
+      const npmNodeExecPath = process.env.npm_node_execpath
+      const childProcess = npmExecPath && npmNodeExecPath
+        ? spawn(npmNodeExecPath, [npmExecPath, 'run', DEVELOPMENT_RESTART_SCRIPT], {
+            cwd: process.cwd(),
+            detached: true,
+            env: {
+              ...process.env,
+              FENYIDIC_RUNTIME_ENV: 'development'
+            },
+            stdio: 'ignore'
+          })
+        : spawn('npm', ['run', DEVELOPMENT_RESTART_SCRIPT], {
+            cwd: process.cwd(),
+            detached: true,
+            env: {
+              ...process.env,
+              FENYIDIC_RUNTIME_ENV: 'development'
+            },
+            shell: process.platform === 'win32',
+            stdio: 'ignore'
+          })
+      childProcess.unref()
+      app.exit(0)
+      return
+    }
+
+    app.relaunch({ args: process.argv.slice(1) })
+    app.exit(0)
+  } catch (error) {
+    console.error('Restart app after setting change failed:', error)
+  }
+}
+
+function shouldRestartAfterSettingChange(key: string, previousValue: unknown, nextValue: unknown): boolean {
+  return (
+    key === APP_LANGUAGE_SETTING_KEY &&
+    typeof nextValue === 'string' &&
+    APP_LANGUAGE_VALUES.has(nextValue) &&
+    previousValue !== nextValue
+  )
+}
 
 interface NormalizedCustomEntryInput {
   headword: string
@@ -2420,7 +2477,11 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.SET_SETTING, (_event, key: string, value: any) => {
+    const previousValue = store.get(key as keyof StoreSchema)
     store.set(key as keyof StoreSchema, value)
+    if (shouldRestartAfterSettingChange(key, previousValue, value)) {
+      setTimeout(restartAppAfterSettingChange, 50)
+    }
     return { success: true }
   })
 
