@@ -6,6 +6,7 @@ interface ConfirmDialogProps {
   isOpen: boolean
   title?: string
   message: string
+  emphasisText?: string
   confirmText?: string
   cancelText?: string
   onConfirm: () => void
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   isOpen,
   title = '确认',
   message,
+  emphasisText,
   confirmText = '确认',
   cancelText = '取消',
   onConfirm,
@@ -43,6 +45,18 @@ export function ConfirmDialog({
 
 
   if (!isOpen) return null
+
+  const translatedMessage = translate(message)
+  const translatedEmphasisText = emphasisText ? translate(emphasisText) : ''
+  const emphasisStartIndex = translatedEmphasisText
+    ? translatedMessage.indexOf(translatedEmphasisText)
+    : -1
+  const messageBeforeEmphasis = emphasisStartIndex >= 0
+    ? translatedMessage.slice(0, emphasisStartIndex)
+    : translatedMessage
+  const messageAfterEmphasis = emphasisStartIndex >= 0
+    ? translatedMessage.slice(emphasisStartIndex + translatedEmphasisText.length)
+    : ''
 
   const buttonStyles = {
     info: 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -92,7 +106,13 @@ export function ConfirmDialog({
         
         {/* 内容 */}
         <div className="px-6 py-5 overflow-y-auto">
-          <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{translate(message)}</p>
+          <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">
+            {messageBeforeEmphasis}
+            {emphasisStartIndex >= 0 && (
+              <strong className="font-semibold text-gray-800">{translatedEmphasisText}</strong>
+            )}
+            {messageAfterEmphasis}
+          </p>
         </div>
         
         {/* 按钮 */}
@@ -139,6 +159,7 @@ interface DialogState {
   isOpen: boolean
   title: string
   message: string
+  emphasisText?: string
   confirmText: string
   cancelText: string
   type: 'info' | 'warning' | 'danger' | 'success'
@@ -152,6 +173,7 @@ export function useConfirmDialog() {
     isOpen: false,
     title: translate('确认'),
     message: '',
+    emphasisText: undefined,
     confirmText: translate('确认'),
     cancelText: translate('取消'),
     type: 'info',
@@ -162,6 +184,7 @@ export function useConfirmDialog() {
   const confirm = useCallback((options: {
     title?: string
     message: string
+    emphasisText?: string
     confirmText?: string
     cancelText?: string
     type?: 'info' | 'warning' | 'danger' | 'success'
@@ -171,6 +194,7 @@ export function useConfirmDialog() {
         isOpen: true,
         title: options.title || translate('确认'),
         message: options.message,
+        emphasisText: options.emphasisText,
         confirmText: options.confirmText || translate('确认'),
         cancelText: options.cancelText || translate('取消'),
         type: options.type || 'info',
@@ -184,6 +208,7 @@ export function useConfirmDialog() {
   const alert = useCallback((options: {
     title?: string
     message: string
+    emphasisText?: string
     confirmText?: string
     type?: 'info' | 'warning' | 'danger' | 'success'
   }): Promise<void> => {
@@ -192,6 +217,7 @@ export function useConfirmDialog() {
         isOpen: true,
         title: options.title || translate('提示'),
         message: options.message,
+        emphasisText: options.emphasisText,
         confirmText: options.confirmText || translate('好的'),
         cancelText: '',
         type: options.type || 'info',
@@ -216,6 +242,7 @@ export function useConfirmDialog() {
       isOpen={state.isOpen}
       title={state.title}
       message={state.message}
+      emphasisText={state.emphasisText}
       confirmText={state.confirmText}
       cancelText={state.cancelText}
       type={state.type}

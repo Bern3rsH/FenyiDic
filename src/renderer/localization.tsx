@@ -68,7 +68,7 @@ const exactEnglishTextTranslations: Record<string, string> = {
   '保存为卡片': 'Save as Card',
   '知道了': 'Got It',
   '保存失败': 'Save Failed',
-  '输入英文并查询释义': 'Enter English to search definitions',
+  '输入英文单词并查询释义': 'Enter an English word to search definitions',
   '输入名称，回车创建': 'Enter a name and press Enter',
   '输入新标签名称...': 'Enter a new tag name...',
   '添加笔记...': 'Add a note...',
@@ -304,6 +304,8 @@ const exactEnglishTextTranslations: Record<string, string> = {
   '读取中': 'Loading',
   '开发模式：预览应用启动 Loading': 'Development: preview app startup loading',
   '预览 Loading': 'Preview Loading',
+  '预览更新': 'Preview Update',
+  '开发模式：预览软件更新内容弹窗': 'Development: preview the software update dialog',
   '不写入': 'No Writes',
   '正常': 'Normal',
   '本次已跳过全部阅读卡片': 'All Reading Cards Were Skipped',
@@ -437,10 +439,9 @@ const semanticMessages = {
     languageRestartCancel: '取消',
     updateCurrentVersion: '当前版本：{version}',
     updateLatestVersion: '最新版本：{version}',
-    updateReleaseName: '版本名称：{name}',
     updateReleaseNotesTitle: '本次更新内容：\n{notes}',
     updateOpenReleasePageQuestion: '是否前往 GitHub Releases 下载新版安装包？',
-    updateMacPrivacyHint: '（每次安装完后都需要去系统设置中的隐私与安全性中点击“仍要打开”）',
+    updateMacPrivacyHint: 'macOS 每次安装完后都需要去系统设置中的隐私与安全性中点击“仍要打开”',
     updateAlreadyLatest: '当前版本 {version} 已是最新版本。'
   },
   'en-US': {
@@ -454,10 +455,9 @@ const semanticMessages = {
     languageRestartCancel: 'Cancel',
     updateCurrentVersion: 'Current version: {version}',
     updateLatestVersion: 'Latest version: {version}',
-    updateReleaseName: 'Release name: {name}',
     updateReleaseNotesTitle: 'What changed:\n{notes}',
     updateOpenReleasePageQuestion: 'Open GitHub Releases to download the new installer?',
-    updateMacPrivacyHint: '(After installing, macOS may require allowing the app again in System Settings > Privacy & Security.)',
+    updateMacPrivacyHint: 'After installing, macOS may require allowing the app again in System Settings > Privacy & Security.',
     updateAlreadyLatest: 'Version {version} is already the latest version.'
   }
 } as const
@@ -512,7 +512,6 @@ function translateTextCore(locale: AppLocale, value: string): string {
   return value
     .replace(/^当前版本：(.+)$/, (_match, version) => `Current version: ${version}`)
     .replace(/^最新版本：(.+)$/, (_match, version) => `Latest version: ${version}`)
-    .replace(/^版本名称：(.+)$/, (_match, name) => `Release name: ${name}`)
     .replace(/^未找到 “(.+)” 的可用词条。$/, (_match, query) => `No available entries found for "${query}".`)
     .replace(/^成功还原了 (\d+) 个项目$/, (_match, count) => `Restored ${count} item(s)`)
     .replace(/^成功添加了 (\d+) 个单词级卡片$/, (_match, count) => `Added ${count} word-level card(s)`)

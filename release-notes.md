@@ -83,3 +83,17 @@
 - Feature: Added support for English interface, allowing users to switch to English mode
 - Feature: Added global loading indicator during app startup
 - Improvement: Improved dictionary download entry with additional Baidu NetDisk download links
+
+## v1.2.1
+
+### 中文
+
+- 优化：优化了更新提示的文案，增加了更新内容的展示
+- 优化：优化了 README，介绍产品功能并支持中英文两种语言
+- 功能：添加了软件打开时检查软件更新的功能
+
+### English
+
+- Improvement: Optimized the update prompt copy, added display of update content
+- Improvement: Optimized the README to introduce product features and support both Chinese and English languages
+- Feature: Added a feature to check for software updates when the app is opened

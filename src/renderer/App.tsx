@@ -32,8 +32,15 @@ const SEARCH_PAGE_MIN_TOP_PADDING_PX = 24
 const HEADER_HEIGHT_FALLBACK_PX = 88
 const EMPTY_RELEASE_NOTES_MESSAGE = '本次发布未填写更新内容。'
 const DEV_STARTUP_LOADING_PREVIEW_MS = 3000
+const DEV_UPDATE_PREVIEW_CURRENT_VERSION = '1.1.0'
+const DEV_UPDATE_PREVIEW_LATEST_VERSION = '1.2.0'
+const DEV_UPDATE_PREVIEW_NOTES = {
+  'zh-CN': '- 支持中英文界面\n- 优化启动 Loading\n- 改进复习卡片布局',
+  'en-US': '- Added Chinese and English interfaces\n- Improved startup loading\n- Refined review card layout'
+} as const
 
 type UpdateRequestStatus = 'idle' | 'checking'
+type UpdateCheckSource = 'manual' | 'startup'
 
 function AppStartupLoading() {
   return (
@@ -72,7 +79,7 @@ function formatReleaseNotesForDialog(releaseNotes: string | null | undefined): s
 }
 
 function App() {
-  const { t, translate } = useLocalization()
+  const { locale, t, translate } = useLocalization()
   // 词典状态
   const [hasDictionary, setHasDictionary] = useState<boolean | null>(null)
   const [showDevDictionarySetup, setShowDevDictionarySetup] = useState(false)
@@ -111,6 +118,7 @@ function App() {
   const headerRef = useRef<HTMLElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(HEADER_HEIGHT_FALLBACK_PX)
   const updateRequestStatusRef = useRef<UpdateRequestStatus>('idle')
+  const hasStartedStartupUpdateCheckRef = useRef(false)
   const devStartupLoadingTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -153,11 +161,44 @@ function App() {
     }
   }, [])
 
-  const handleCheckForAppUpdate = useCallback(async () => {
+  const showAvailableUpdateDialog = useCallback(async ({
+    currentVersion,
+    latestVersion,
+    releaseNotes
+  }: {
+    currentVersion: string
+    latestVersion: string
+    releaseNotes?: string | null
+  }): Promise<boolean> => {
+    const formattedReleaseNotes = translate(formatReleaseNotesForDialog(releaseNotes))
+    const updateMessage = [
+      t('updateMacPrivacyHint'),
+      t('updateCurrentVersion', { version: currentVersion }),
+      t('updateLatestVersion', { version: latestVersion }),
+      t('updateReleaseNotesTitle', { notes: formattedReleaseNotes }),
+      t('updateOpenReleasePageQuestion')
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+
+    return confirm({
+      title: translate('发现新版本'),
+      message: updateMessage,
+      emphasisText: t('updateMacPrivacyHint'),
+      confirmText: translate('前往下载'),
+      cancelText: translate('稍后'),
+      type: 'info'
+    })
+  }, [confirm, t, translate])
+
+  const handleCheckForAppUpdate = useCallback(async (
+    source: UpdateCheckSource = 'manual'
+  ) => {
     if (updateRequestStatusRef.current !== 'idle') {
       return
     }
 
+    const shouldShowStatusDialogs = source === 'manual'
     updateRequestStatusRef.current = 'checking'
     setUpdateRequestStatus('checking')
 
@@ -165,56 +206,49 @@ function App() {
       const updateCheckResult = await window.api.checkForAppUpdate()
       captureTelemetryEvent('app_update_checked', {
         status: updateCheckResult.status,
-        update_available: updateCheckResult.status === 'available'
+        update_available: updateCheckResult.status === 'available',
+        source
       })
 
       if (updateCheckResult.status === 'unsupported') {
-        await alert({
-          title: translate('当前环境无法检查更新'),
-          message: translate(updateCheckResult.reason),
-          type: 'warning'
-        })
+        if (shouldShowStatusDialogs) {
+          await alert({
+            title: translate('当前环境无法检查更新'),
+            message: translate(updateCheckResult.reason),
+            type: 'warning'
+          })
+        }
         return
       }
 
       if (updateCheckResult.status === 'error') {
-        await alert({
-          title: translate('检查更新失败'),
-          message: translate(updateCheckResult.error),
-          type: 'danger'
-        })
+        if (shouldShowStatusDialogs) {
+          await alert({
+            title: translate('检查更新失败'),
+            message: translate(updateCheckResult.error),
+            type: 'danger'
+          })
+        } else {
+          console.warn('[Update] Startup update check failed:', updateCheckResult.error)
+        }
         return
       }
 
       if (updateCheckResult.status === 'not-available') {
-        await alert({
-          title: translate('已是最新版本'),
-          message: t('updateAlreadyLatest', { version: updateCheckResult.currentVersion }),
-          type: 'success'
-        })
+        if (shouldShowStatusDialogs) {
+          await alert({
+            title: translate('已是最新版本'),
+            message: t('updateAlreadyLatest', { version: updateCheckResult.currentVersion }),
+            type: 'success'
+          })
+        }
         return
       }
 
-      const releaseNotes = translate(formatReleaseNotesForDialog(updateCheckResult.updateInfo.releaseNotes))
-      const updateMessage = [
-        t('updateCurrentVersion', { version: updateCheckResult.currentVersion }),
-        t('updateLatestVersion', { version: updateCheckResult.updateInfo.version }),
-        updateCheckResult.updateInfo.releaseName
-          ? t('updateReleaseName', { name: updateCheckResult.updateInfo.releaseName })
-          : null,
-        t('updateReleaseNotesTitle', { notes: releaseNotes }),
-        t('updateOpenReleasePageQuestion'),
-        t('updateMacPrivacyHint')
-      ]
-        .filter(Boolean)
-        .join('\n\n')
-
-      const shouldOpenReleasePage = await confirm({
-        title: translate('发现新版本'),
-        message: updateMessage,
-        confirmText: translate('前往下载'),
-        cancelText: translate('稍后'),
-        type: 'info'
+      const shouldOpenReleasePage = await showAvailableUpdateDialog({
+        currentVersion: updateCheckResult.currentVersion,
+        latestVersion: updateCheckResult.updateInfo.version,
+        releaseNotes: updateCheckResult.updateInfo.releaseNotes
       })
 
       if (!shouldOpenReleasePage) {
@@ -234,16 +268,21 @@ function App() {
         })
       }
     } catch (error) {
-      await alert({
-        title: translate('检查更新失败'),
-        message: translate(getErrorMessage(error)),
-        type: 'danger'
-      })
+      const errorMessage = getErrorMessage(error)
+      if (shouldShowStatusDialogs) {
+        await alert({
+          title: translate('检查更新失败'),
+          message: translate(errorMessage),
+          type: 'danger'
+        })
+      } else {
+        console.warn('[Update] Startup update check failed:', errorMessage)
+      }
     } finally {
       updateRequestStatusRef.current = 'idle'
       setUpdateRequestStatus('idle')
     }
-  }, [alert, confirm, t, translate])
+  }, [alert, showAvailableUpdateDialog, translate])
 
   useEffect(() => {
     const headerElement = headerRef.current
@@ -285,8 +324,13 @@ function App() {
       })
 
     const removeOpenUpdateDialogListener = window.api.onOpenAppUpdateCheckDialog(() => {
-      void handleCheckForAppUpdate()
+      void handleCheckForAppUpdate('manual')
     })
+
+    if (!hasStartedStartupUpdateCheckRef.current) {
+      hasStartedStartupUpdateCheckRef.current = true
+      void handleCheckForAppUpdate('startup')
+    }
 
     return () => {
       isEffectActive = false
@@ -544,6 +588,13 @@ function App() {
       devStartupLoadingTimerRef.current = null
     }, DEV_STARTUP_LOADING_PREVIEW_MS)
   }
+  const previewDevUpdateDialog = () => {
+    void showAvailableUpdateDialog({
+      currentVersion: DEV_UPDATE_PREVIEW_CURRENT_VERSION,
+      latestVersion: DEV_UPDATE_PREVIEW_LATEST_VERSION,
+      releaseNotes: DEV_UPDATE_PREVIEW_NOTES[locale]
+    })
+  }
   const devTools = import.meta.env.DEV ? (
     <div className="fixed bottom-4 right-4 z-50 flex flex-wrap justify-end gap-2">
       <button
@@ -563,6 +614,13 @@ function App() {
         title="开发模式：预览应用启动 Loading"
       >
         预览 Loading
+      </button>
+      <button
+        onClick={previewDevUpdateDialog}
+        className={`${devFloatingButtonBaseClass} border-gray-200 bg-white/95 text-gray-600 hover:bg-gray-50`}
+        title="开发模式：预览软件更新内容弹窗"
+      >
+        预览更新
       </button>
       <button
         onClick={() => setReviewDebugNoFsrs((prev) => !prev)}

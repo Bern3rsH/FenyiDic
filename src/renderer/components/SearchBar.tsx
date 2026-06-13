@@ -162,7 +162,7 @@ function SearchBar({ onWordSelect, initialQuery = '', variant = 'page' }: Search
         value={query}
         onChange={(e) => updateQuery(e.target.value)}
         onFocus={handleInputFocus}
-        placeholder="输入英文并查询释义"
+        placeholder="输入英文单词并查询释义"
         className={searchInputClassName}
         autoFocus={!isNavVariant}
       />
