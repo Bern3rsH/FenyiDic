@@ -76,7 +76,7 @@ FenyiDic 使用 FSRS 安排复习进度，并允许为不同标签指定不同�
 
 - [GitHub Releases](https://github.com/Bern3rsH/FenyiDic/releases/latest)
 
-macOS 每次安装新版本后，可能需要前往“系统设置 > 隐私与安全性”点击“仍要打开”。
+> **安装提示：** 首次安装 FenyiDic 以及后续安装新版本后，都需要前往“系统设置 > 隐私与安全性”，点击“仍要打开”（Open Anyway），然后重新打开 FenyiDic。
 
 ## 词典数据
 

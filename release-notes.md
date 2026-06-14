@@ -97,3 +97,13 @@
 - Improvement: Optimized the update prompt copy, added display of update content
 - Improvement: Optimized the README to introduce product features and support both Chinese and English languages
 - Feature: Added a feature to check for software updates when the app is opened
+
+## v1.2.2
+
+### 中文
+
+- 优化：优化了 README 中对于安装需要打开安全设置的说明
+
+### English
+
+- Improvement: Optimized the README explanation for opening security settings during installation

@@ -76,7 +76,7 @@ Current releases are available for both Apple Silicon and Intel Macs:
 
 - [GitHub Releases](https://github.com/Bern3rsH/FenyiDic/releases/latest)
 
-After installing a new version, macOS may require you to open System Settings > Privacy & Security and click Open Anyway.
+> **Installation notice:** After the first installation of FenyiDic and after installing each subsequent update, open System Settings > Privacy & Security, click Open Anyway, and then reopen FenyiDic.
 
 ## Dictionary Data
 
