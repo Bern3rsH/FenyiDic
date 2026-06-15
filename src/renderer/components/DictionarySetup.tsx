@@ -50,6 +50,9 @@ export default function DictionarySetup({ onComplete }: DictionarySetupProps) {
     if (result.success && result.filePaths && result.filePaths.length > 0) {
       setMdxPath(result.filePaths[0])
       setError(null)
+    } else if (!result.canceled && result.error) {
+      setMdxPath(null)
+      setError(result.error)
     }
   }
 

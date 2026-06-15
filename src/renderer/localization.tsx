@@ -75,6 +75,7 @@ const exactEnglishTextTranslations: Record<string, string> = {
   '添加词条笔记...': 'Add an entry note...',
   '可输入单词、短语或句子': 'Enter a word, phrase, or sentence',
   '输入这条内容对应的中文翻译': 'Enter the Chinese translation for this content',
+  '输入这条内容对应的英文翻译': 'Enter the English translation for this content',
   '可选；会作为这条释义卡片的笔记显示': 'Optional; shown as the note for this sense card',
   '输入这句英文例句': 'Enter this English example',
   '输入这句例句对应的中文翻译': 'Enter the Chinese translation for this example',
@@ -179,6 +180,8 @@ const exactEnglishTextTranslations: Record<string, string> = {
   '打开下载页面失败': 'Failed to Open Download Page',
   '无法打开 GitHub Releases 页面，请稍后再试。': 'Could not open the GitHub Releases page. Please try again later.',
   '请先选择 MDX 词典文件': 'Select an MDX dictionary file first',
+  '当前仅支持指定的牛津双解 MDX 词典文件，请重新选择':
+    'Only the specified Oxford bilingual MDX dictionary file is supported. Please select it again.',
   '准备导入...': 'Preparing import...',
   '导入失败': 'Import failed',
   '查看 CSV 导入字段说明': 'View CSV import field help',
@@ -337,6 +340,7 @@ const exactEnglishTextTranslations: Record<string, string> = {
   '支持单词、短语和句子；保存后会生成新的自定义卡片。相同英文内容重复录入时，会追加到同一条自定义词条下，作为新的释义卡片保存。': 'Supports words, phrases, and sentences. Saving creates a custom card. Reusing the same English text adds a new sense card to the existing custom entry.',
   '英文原文（必填）': 'English Text (Required)',
   '中文翻译（必填）': 'Chinese Translation (Required)',
+  '英文翻译（选填）': 'English Translation (Optional)',
   '笔记（选填）': 'Note (Optional)',
   '例句（选填）': 'Examples (Optional)',
   '英文句子': 'English Sentence',
@@ -474,6 +478,7 @@ const translatableAttributeNames = [
 ] as const
 
 const textNodeOriginalValues = new WeakMap<Text, string>()
+const textNodeLocalizedValues = new WeakMap<Text, string>()
 const elementOriginalAttributeValues = new WeakMap<Element, Map<string, string>>()
 
 interface LocalizationContextValue {
@@ -602,10 +607,18 @@ function translateTextNode(locale: AppLocale, node: Text): void {
   }
 
   const currentValue = node.nodeValue || ''
-  const originalValue = textNodeOriginalValues.get(node) || currentValue
+  const previousOriginalValue = textNodeOriginalValues.get(node)
+  const previousLocalizedValue = textNodeLocalizedValues.get(node)
+  const originalValue =
+    previousOriginalValue === undefined ||
+    previousLocalizedValue === undefined ||
+    currentValue !== previousLocalizedValue
+      ? currentValue
+      : previousOriginalValue
   textNodeOriginalValues.set(node, originalValue)
 
   const translatedValue = translateUiText(locale, originalValue)
+  textNodeLocalizedValues.set(node, translatedValue)
   if (node.nodeValue !== translatedValue) {
     node.nodeValue = translatedValue
   }

@@ -520,6 +520,22 @@ function SenseCard({
   const isNoteActive = !!note || isEditing
   const isIdiom = pos === 'idiom'
   const isCompact = size === 'compact'
+  const hasEnglishDefinition = sense.definition.trim() !== ''
+  const hasChineseDefinition = Boolean(sense.definition_cn?.trim())
+  const showEnglishDefinition =
+    hasEnglishDefinition &&
+    (
+      displayMode === 'en' ||
+      displayMode === 'both' ||
+      (displayMode === 'cn' && !hasChineseDefinition)
+    )
+  const showChineseDefinition =
+    hasChineseDefinition &&
+    (
+      displayMode === 'cn' ||
+      displayMode === 'both' ||
+      (displayMode === 'en' && !hasEnglishDefinition)
+    )
 
   // 判断 grammar 是否只是基础词性（会和 pos 重复）
   const BASIC_POS = ['adjective', 'noun', 'verb', 'adverb', 'preposition', 'pronoun', 'conjunction', 'exclamation', 'determiner', 'number', 'modal']
@@ -654,7 +670,7 @@ function SenseCard({
               {/* 释义区域 */}
               <div>
                 {/* 英文释义 - 主要内容 */}
-                {(displayMode === 'en' || displayMode === 'both') && (
+                {showEnglishDefinition && (
                   <p
                     className={`definition text-gray-900 font-semibold ${
                       isCompact ? 'text-base leading-7' : 'text-lg leading-relaxed'
@@ -665,7 +681,7 @@ function SenseCard({
                 )}
 
                 {/* 中文释义 */}
-                {sense.definition_cn && (displayMode === 'cn' || displayMode === 'both') && (
+                {showChineseDefinition && (
                   <p
                     className={`definition-cn text-gray-700 font-semibold ${
                       isCompact ? 'mt-1.5 text-sm leading-6' : 'mt-1 text-base'

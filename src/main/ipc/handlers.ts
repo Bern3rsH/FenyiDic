@@ -25,6 +25,8 @@ import {
   getActiveDictionary,
   hasDictionary,
   importDictionary,
+  isSupportedMdxFile,
+  UNSUPPORTED_MDX_ERROR_MESSAGE,
   deleteDictionary,
   setActiveDictionary
 } from '../services/dictionary-importer'
@@ -74,6 +76,7 @@ const DICTIONARY_SEARCH_SOURCE_LABEL = '词典'
 const DIRECT_REDIRECT_PREFIX = '@@@LINK='
 const MAX_CUSTOM_HEADWORD_LENGTH = 500
 const MAX_CUSTOM_NOTE_LENGTH = 2000
+const MAX_CUSTOM_DEFINITION_EN_LENGTH = 4000
 const MAX_CUSTOM_DEFINITION_CN_LENGTH = 4000
 const MAX_CUSTOM_EXAMPLE_EN_LENGTH = 1000
 const MAX_CUSTOM_EXAMPLE_CN_LENGTH = 2000
@@ -131,6 +134,7 @@ function shouldRestartAfterSettingChange(key: string, previousValue: unknown, ne
 
 interface NormalizedCustomEntryInput {
   headword: string
+  definitionEn: string
   definitionCn: string
   note: string
   examples: Array<{ en: string; cn: string }>
@@ -624,11 +628,13 @@ function normalizeCustomExamples(rawExamples: unknown):
 
 function normalizeCustomEntryInput(payload: {
   headword?: unknown
+  definitionEn?: unknown
   definitionCn?: unknown
   note?: unknown
   examples?: unknown
 }): { success: true; data: NormalizedCustomEntryInput } | { success: false; error: string } {
   const normalizedHeadword = typeof payload?.headword === 'string' ? payload.headword.trim() : ''
+  const normalizedDefinitionEn = typeof payload?.definitionEn === 'string' ? payload.definitionEn.trim() : ''
   const normalizedDefinitionCn = typeof payload?.definitionCn === 'string' ? payload.definitionCn.trim() : ''
   const normalizedNote = typeof payload?.note === 'string' ? payload.note.trim() : ''
   const normalizedExamplesResult = normalizeCustomExamples(payload?.examples)
@@ -645,6 +651,9 @@ function normalizeCustomEntryInput(payload: {
   if (normalizedNote.length > MAX_CUSTOM_NOTE_LENGTH) {
     return { success: false, error: `笔记不能超过 ${MAX_CUSTOM_NOTE_LENGTH} 个字符` }
   }
+  if (normalizedDefinitionEn.length > MAX_CUSTOM_DEFINITION_EN_LENGTH) {
+    return { success: false, error: `英文翻译不能超过 ${MAX_CUSTOM_DEFINITION_EN_LENGTH} 个字符` }
+  }
   if (normalizedDefinitionCn.length > MAX_CUSTOM_DEFINITION_CN_LENGTH) {
     return { success: false, error: `中文内容不能超过 ${MAX_CUSTOM_DEFINITION_CN_LENGTH} 个字符` }
   }
@@ -656,6 +665,7 @@ function normalizeCustomEntryInput(payload: {
     success: true,
     data: {
       headword: normalizedHeadword,
+      definitionEn: normalizedDefinitionEn,
       definitionCn: normalizedDefinitionCn,
       note: normalizedNote,
       examples: normalizedExamplesResult.examples
@@ -1176,7 +1186,7 @@ export function registerIpcHandlers(): void {
         return { success: false, error: normalizedInputResult.error }
       }
 
-      const { headword, definitionCn, note, examples } = normalizedInputResult.data
+      const { headword, definitionEn, definitionCn, note, examples } = normalizedInputResult.data
       const serializedExamples = JSON.stringify(examples)
 
       const createCustomEntry = db.transaction(() => {
@@ -1221,7 +1231,7 @@ export function registerIpcHandlers(): void {
         `).run(
           customInternalWordId,
           nextSenseIndexRow.next_sense_index,
-          '',
+          definitionEn,
           definitionCn,
           serializedExamples
         )
@@ -1259,7 +1269,7 @@ export function registerIpcHandlers(): void {
         return { success: false, error: '仅支持编辑手动录入的释义卡片' }
       }
 
-      const { headword, definitionCn, note, examples } = normalizedInputResult.data
+      const { headword, definitionEn, definitionCn, note, examples } = normalizedInputResult.data
       const serializedExamples = JSON.stringify(examples)
 
       const updateCustomEntry = db.transaction(() => {
@@ -1297,9 +1307,9 @@ export function registerIpcHandlers(): void {
 
         db.prepare(`
           UPDATE user_db.custom_senses
-          SET definition_cn = ?, examples = ?, updated_at = CURRENT_TIMESTAMP
+          SET definition = ?, definition_cn = ?, examples = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(definitionCn, serializedExamples, currentCustomSense.id)
+        `).run(definitionEn, definitionCn, serializedExamples, currentCustomSense.id)
 
         saveCustomSenseNote(db, externalSenseId, note)
 
@@ -2513,6 +2523,13 @@ export function registerIpcHandlers(): void {
       return { success: false, canceled: true }
     }
 
+    if (type === 'mdx' && !(await isSupportedMdxFile(result.filePaths[0]))) {
+      return {
+        success: false,
+        error: UNSUPPORTED_MDX_ERROR_MESSAGE
+      }
+    }
+
     return {
       success: true,
       filePaths: result.filePaths
@@ -2544,7 +2561,10 @@ export function registerIpcHandlers(): void {
         return { success: true, config }
       } catch (error) {
         console.error('Dictionary import failed:', error)
-        return { success: false, error: String(error) }
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
       }
     }
   )

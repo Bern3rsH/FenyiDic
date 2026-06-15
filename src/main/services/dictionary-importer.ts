@@ -5,9 +5,18 @@
  */
 
 import { app, BrowserWindow } from 'electron'
-import { join, basename } from 'path'
-import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, unlinkSync } from 'fs'
-import { randomUUID } from 'crypto'
+import { join, basename, extname } from 'path'
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
+  readFileSync,
+  unlinkSync,
+  statSync
+} from 'fs'
+import { createHash, randomUUID } from 'crypto'
 import Database from 'better-sqlite3'
 import { UserDictionaryConfig, DictionaryImportProgress, DictionaryParserType } from '../../shared/types'
 import { AdvancedParser } from '../dictionary/adapters/advanced/parser'
@@ -16,6 +25,13 @@ import { BaseDictionaryParser } from '../dictionary/adapters/base'
 // Import mdict-js
 import MdictModule from 'mdict-js'
 const Mdict = (MdictModule as any).default || MdictModule
+
+export const UNSUPPORTED_MDX_ERROR_MESSAGE =
+  '当前仅支持指定的牛津双解 MDX 词典文件，请重新选择'
+
+const SUPPORTED_MDX_FILE_SIZE = 76208318
+const SUPPORTED_MDX_SHA256 =
+  '09f209d2d0a98c05c45cc6c98a468648b3fe5edf0c97d8bfe2d5a43ff206bc2f'
 
 // Paths
 function getDictionariesDir(): string {
@@ -74,7 +90,35 @@ export function hasDictionary(): boolean {
   return configs.length > 0 && configs.some(c => c.isActive)
 }
 
+async function calculateFileSha256(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256')
+    const stream = createReadStream(filePath)
 
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('error', reject)
+    stream.on('end', () => resolve(hash.digest('hex')))
+  })
+}
+
+export async function isSupportedMdxFile(filePath: string): Promise<boolean> {
+  if (extname(filePath).toLowerCase() !== '.mdx' || !existsSync(filePath)) {
+    return false
+  }
+
+  try {
+    const fileStats = statSync(filePath)
+    if (!fileStats.isFile() || fileStats.size !== SUPPORTED_MDX_FILE_SIZE) {
+      return false
+    }
+
+    const digest = await calculateFileSha256(filePath)
+    return digest === SUPPORTED_MDX_SHA256
+  } catch (error) {
+    console.error('Failed to validate MDX dictionary file:', error)
+    return false
+  }
+}
 
 /**
  * Get parser based on type
@@ -106,6 +150,10 @@ export async function importDictionary(
   parserType: DictionaryParserType,
   window: BrowserWindow | null
 ): Promise<UserDictionaryConfig> {
+  if (!(await isSupportedMdxFile(mdxPath))) {
+    throw new Error(UNSUPPORTED_MDX_ERROR_MESSAGE)
+  }
+
   const dictId = randomUUID()
   const dictDir = join(getDictionariesDir(), dictId)
   mkdirSync(dictDir, { recursive: true })

@@ -16,6 +16,7 @@ interface UseSearchSuggestionsResult {
   loading: boolean
   setQuery: (nextQuery: string) => void
   clearResults: () => void
+  refreshResults: () => void
 }
 
 function resultMatchesQuery(result: SearchResultItem, normalizedQuery: string): boolean {
@@ -41,6 +42,7 @@ export function useSearchSuggestions({
     items: SearchResultItem[]
   }>({ query: initialQuery.trim(), items: [] })
   const [loading, setLoading] = useState(false)
+  const [refreshRevision, setRefreshRevision] = useState(0)
   const requestIdRef = useRef(0)
   const latestQueryRef = useRef(initialQuery)
   const normalizedQuery = query.trim()
@@ -57,6 +59,12 @@ export function useSearchSuggestions({
     setQueryState(nextQuery)
     clearResults()
   }, [clearResults])
+
+  const refreshResults = useCallback(() => {
+    requestIdRef.current += 1
+    setLoading(false)
+    setRefreshRevision((currentRevision) => currentRevision + 1)
+  }, [])
 
   useEffect(() => {
     setQuery(initialQuery)
@@ -102,7 +110,7 @@ export function useSearchSuggestions({
     }, debounceMs)
 
     return () => window.clearTimeout(timerId)
-  }, [clearResults, debounceMs, enabled, errorLogMessage, limit, normalizedQuery])
+  }, [clearResults, debounceMs, enabled, errorLogMessage, limit, normalizedQuery, refreshRevision])
 
   return {
     query,
@@ -110,6 +118,7 @@ export function useSearchSuggestions({
     results,
     loading,
     setQuery,
-    clearResults
+    clearResults,
+    refreshResults
   }
 }

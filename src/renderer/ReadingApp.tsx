@@ -3,6 +3,7 @@ import { SYSTEM_TAGS } from '../shared/types'
 import type { SearchResultItem } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
 import ArchiveIcon from './components/ArchiveIcon'
+import ManualEntryDialog from './components/ManualEntryDialog'
 import SenseCard from './components/SenseCard'
 import TagSelector from './components/TagSelector'
 import WordPronunciation from './components/WordPronunciation'
@@ -1786,6 +1787,7 @@ export default function ReadingApp() {
   const [isBatchTagDialogOpen, setIsBatchTagDialogOpen] = useState(false)
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const [isLookupSearchDropdownOpen, setIsLookupSearchDropdownOpen] = useState(false)
+  const [isLookupManualEntryDialogOpen, setIsLookupManualEntryDialogOpen] = useState(false)
   const [isLookupWordDetailsExpanded, setIsLookupWordDetailsExpanded] = useState(false)
   const [collapsedLookupSenseGroups, setCollapsedLookupSenseGroups] = useState<Set<string>>(new Set())
   const [isLookupWordTagSelectorOpen, setIsLookupWordTagSelectorOpen] = useState(false)
@@ -1805,7 +1807,8 @@ export default function ReadingApp() {
     results: lookupSearchResults,
     loading: isLookupSearchLoading,
     setQuery: setLookupSearchInputValue,
-    clearResults: clearLookupSearchResults
+    clearResults: clearLookupSearchResults,
+    refreshResults: refreshLookupSearchResults
   } = useSearchSuggestions({
     initialQuery: lookupPanelState.queryText,
     enabled: lookupSearchSuggestionsEnabled,
@@ -1813,6 +1816,9 @@ export default function ReadingApp() {
     debounceMs: READING_LOOKUP_SEARCH_DEBOUNCE_MS,
     errorLogMessage: 'Search reading lookup suggestions failed:'
   })
+  const normalizedLookupManualEntryQuery = lookupSearchInputValue.trim()
+  const canCreateLookupManualEntry =
+    lookupPanelState.tokenId !== '' && normalizedLookupManualEntryQuery.length > 0
 
   const normalizedDraftText = draftText.trim()
   const isInputTextLocked = committedText.trim().length > 0
@@ -1909,6 +1915,7 @@ export default function ReadingApp() {
     setLookupSearchInputValue('')
     clearLookupSearchResults()
     setIsLookupSearchDropdownOpen(false)
+    setIsLookupManualEntryDialogOpen(false)
     setCollapsedLookupSenseGroups(new Set())
     setIsLookupWordDetailsExpanded(false)
     setIsLookupWordTagSelectorOpen(false)
@@ -2621,11 +2628,57 @@ export default function ReadingApp() {
       return
     }
 
+    if (lookupSearchResults.length === 0 && !isLookupSearchLoading) {
+      refreshLookupSearchResults()
+    }
     setIsLookupSearchDropdownOpen(true)
   }
 
   const handleLookupSearchInputBlur = () => {
     window.setTimeout(() => setIsLookupSearchDropdownOpen(false), 120)
+  }
+
+  const openLookupManualEntryDialog = () => {
+    if (!canCreateLookupManualEntry) {
+      return
+    }
+
+    setIsLookupSearchDropdownOpen(false)
+    setIsLookupManualEntryDialogOpen(true)
+  }
+
+  const closeLookupManualEntryDialog = () => {
+    setIsLookupManualEntryDialogOpen(false)
+  }
+
+  const handleLookupManualEntryCompleted = async (wordId: number, headword: string) => {
+    if (lookupPanelState.tokenId === '') {
+      setIsLookupManualEntryDialogOpen(false)
+      return
+    }
+
+    const currentLookupContext = {
+      sourceLabel: lookupPanelState.sourceLabel || lookupPanelState.queryText,
+      tokenId: lookupPanelState.tokenId,
+      normalizedToken: lookupPanelState.normalizedToken,
+      occurrenceIndex: lookupPanelState.occurrenceIndex
+    }
+
+    setLookupSearchInputValue(headword)
+    clearLookupSearchResults()
+    setIsLookupSearchDropdownOpen(false)
+    setIsLookupManualEntryDialogOpen(false)
+
+    await loadLookupByWordId(
+      wordId,
+      headword,
+      currentLookupContext.sourceLabel,
+      currentLookupContext.tokenId,
+      currentLookupContext.normalizedToken,
+      currentLookupContext.occurrenceIndex,
+      null,
+      headword
+    )
   }
 
   const handleLookupSearchResultSelect = async (result: SearchResultItem) => {
@@ -3367,27 +3420,50 @@ export default function ReadingApp() {
                       <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
                         {isLookupSearchLoading ? (
                           <div className="px-3 py-3 text-xs text-slate-500">搜索中...</div>
-                        ) : lookupSearchResults.length > 0 ? (
+                        ) : (
                           <div className="max-h-60 overflow-y-auto">
-                            {lookupSearchResults.map((result) => (
+                            {lookupSearchResults.length > 0 ? (
+                              lookupSearchResults.map((result) => (
+                                <button
+                                  key={`${result.id}:${result.lookupHeadword || result.headword}:${result.headword}`}
+                                  type="button"
+                                  onClick={() => void handleLookupSearchResultSelect(result)}
+                                  className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition hover:bg-blue-50"
+                                >
+                                  <span className="min-w-0 truncate text-sm font-medium text-slate-800">
+                                    {result.headword}
+                                  </span>
+                                  <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-400">
+                                    {result.dict_name}
+                                  </span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="border-b border-slate-100 px-3 py-3 text-xs leading-5 text-slate-500">
+                                未找到可替换的词条。
+                              </div>
+                            )}
+
+                            {canCreateLookupManualEntry && (
                               <button
-                                key={`${result.id}:${result.lookupHeadword || result.headword}:${result.headword}`}
                                 type="button"
-                                onClick={() => void handleLookupSearchResultSelect(result)}
-                                className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-blue-50"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={openLookupManualEntryDialog}
+                                className="flex w-full items-center gap-3 px-3 py-3 text-left text-blue-700 transition hover:bg-blue-50"
                               >
-                                <span className="min-w-0 truncate text-sm font-medium text-slate-800">
-                                  {result.headword}
+                                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
+                                  </svg>
                                 </span>
-                                <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-400">
-                                  {result.dict_name}
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-medium">手动输入</span>
+                                  <span className="mt-0.5 block text-xs text-blue-600/80">
+                                    适合词典里没有的短语、句子或自定义释义
+                                  </span>
                                 </span>
                               </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="px-3 py-3 text-xs leading-5 text-slate-500">
-                            未找到可替换的词条。
+                            )}
                           </div>
                         )}
                       </div>
@@ -3766,6 +3842,13 @@ export default function ReadingApp() {
               onClose={() => setIsLookupWordTagSelectorOpen(false)}
             />
           )}
+
+          <ManualEntryDialog
+            isOpen={isLookupManualEntryDialogOpen}
+            initialHeadword={normalizedLookupManualEntryQuery}
+            onClose={closeLookupManualEntryDialog}
+            onCompleted={(wordId, headword) => void handleLookupManualEntryCompleted(wordId, headword)}
+          />
 
           <div className="flex items-center justify-between gap-3">
             <button

@@ -11,6 +11,7 @@ interface ManualEntryDialogInitialData {
   senseId: number
   headword: string
   definitionCn: string
+  definitionEn?: string
   note?: string
   examples?: CreateCustomEntryExample[]
 }
@@ -94,6 +95,7 @@ export default function ManualEntryDialog({
   const { translate } = useLocalization()
   const [headword, setHeadword] = useState('')
   const [definitionCn, setDefinitionCn] = useState('')
+  const [definitionEn, setDefinitionEn] = useState('')
   const [note, setNote] = useState('')
   const [examples, setExamples] = useState<ManualEntryExampleInput[]>([])
   const [errorDialogState, setErrorDialogState] = useState<ErrorDialogState | null>(null)
@@ -114,12 +116,14 @@ export default function ManualEntryDialog({
       : {
           headword: initialHeadword.trim(),
           definitionCn: '',
+          definitionEn: '',
           note: '',
           examples: []
         }
 
     setHeadword(dialogInitialData.headword.trim())
     setDefinitionCn(dialogInitialData.definitionCn)
+    setDefinitionEn(dialogInitialData.definitionEn || '')
     setNote(dialogInitialData.note || '')
     const initialExampleInputs = buildInitialExampleInputs(dialogInitialData.examples)
     nextExampleInputIdRef.current = initialExampleInputs.length
@@ -182,6 +186,7 @@ export default function ManualEntryDialog({
   const handleSubmit = async () => {
     const normalizedHeadword = headword.trim()
     const normalizedDefinitionCn = definitionCn.trim()
+    const normalizedDefinitionEn = definitionEn.trim()
     const normalizedNote = note.trim()
     const normalizedExamples = examples.map((example) => ({
       en: example.en.trim(),
@@ -217,6 +222,7 @@ export default function ManualEntryDialog({
       const sharedPayload = {
         headword: normalizedHeadword,
         definitionCn: normalizedDefinitionCn,
+        definitionEn: normalizedDefinitionEn || undefined,
         note: normalizedNote || undefined,
         examples: filledExamples.length > 0 ? filledExamples : undefined
       }
@@ -290,6 +296,17 @@ export default function ManualEntryDialog({
                 value={definitionCn}
                 onChange={(event) => setDefinitionCn(event.target.value)}
                 placeholder="输入这条内容对应的中文翻译"
+                rows={4}
+                className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-700">英文翻译（选填）</span>
+              <textarea
+                value={definitionEn}
+                onChange={(event) => setDefinitionEn(event.target.value)}
+                placeholder="输入这条内容对应的英文翻译"
                 rows={4}
                 className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               />

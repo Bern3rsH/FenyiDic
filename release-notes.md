@@ -107,3 +107,19 @@
 ### English
 
 - Improvement: Optimized the README explanation for opening security settings during installation
+
+## v1.2.3
+
+### 中文
+
+- 修复：修复了阅读过程中查词，左侧标记词内容不刷新的问题
+- 功能：支持在阅读过程中，手动输入单词释义
+- 功能：手动输入单词释义支持英文释义输入
+- 功能：导入 mdx 文件的时候增加防呆设计，如果非支持 mdx 文件，阻止导入
+
+### English
+
+- Bug Fix: Fixed the issue where the left marked word content would not refresh during word lookup in the reading process
+- Feature: Added support for manually entering word definitions during the reading process
+- Feature: Manual word definition input now supports English definitions
+- Feature: Added a safeguard when importing mdx files to prevent importing unsupported file types

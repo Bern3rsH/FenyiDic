@@ -57,6 +57,7 @@ interface EditingCustomSenseState {
   senseId: number
   headword: string
   definitionCn: string
+  definitionEn?: string
   note?: string
   examples: CreateCustomEntryExample[]
 }
@@ -526,6 +527,7 @@ function WordEntry({
       senseId: sense.id,
       headword: word.headword,
       definitionCn: sense.definition_cn || '',
+      definitionEn: decodeStoredCustomEntryText(sense.definition || ''),
       note: sense.favorite_note,
       examples: parseCustomEntryExamples(sense.examples)
     })

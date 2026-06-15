@@ -224,6 +224,7 @@ export interface CreateCustomEntryExample {
 export interface CreateCustomEntryPayload {
   headword: string
   definitionCn: string
+  definitionEn?: string
   note?: string
   examples?: CreateCustomEntryExample[]
 }
@@ -239,6 +240,7 @@ export interface UpdateCustomEntryPayload {
   senseId: number
   headword: string
   definitionCn: string
+  definitionEn?: string
   note?: string
   examples?: CreateCustomEntryExample[]
 }

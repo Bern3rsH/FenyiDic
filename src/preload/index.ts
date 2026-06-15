@@ -103,7 +103,12 @@ export type IpcApi = {
 
   // 词典管理
   checkDictionary: () => Promise<DictionaryStatus>
-  selectDictionaryFile: (type: 'mdx' | 'mdd') => Promise<{ success: boolean; canceled?: boolean; filePaths?: string[] }>
+  selectDictionaryFile: (type: 'mdx' | 'mdd') => Promise<{
+    success: boolean
+    canceled?: boolean
+    filePaths?: string[]
+    error?: string
+  }>
   importDictionary: (mdxPath: string, mddPaths: string[], parserType: DictionaryParserType) => Promise<{ success: boolean; config?: UserDictionaryConfig; error?: string }>
   listDictionaries: () => Promise<UserDictionaryConfig[]>
   deleteDictionary: (dictId: string) => Promise<{ success: boolean }>
