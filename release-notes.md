@@ -149,7 +149,9 @@
 ### 中文
 
 - 修复：关闭 ad-hoc 签名包中的 hardened runtime，恢复 macOS 设置中“仍要打开”的安装路径
+- 安装说明：如果通过浏览器下载后 macOS 提示应用已损坏、无法验证开发者，或点击后只显示 Dock 图标没有窗口，请先将 FenyiDic 拖入“应用程序”，再在终端执行 `sudo /usr/bin/xattr -dr com.apple.quarantine "/Applications/FenyiDic.app"`，然后重新打开应用
 
 ### English
 
 - Bug Fix: Disabled hardened runtime for ad-hoc signed builds to restore the macOS Open Anyway installation path
+- Installation Note: If macOS says the app is damaged, cannot verify the developer, or only shows the Dock icon with no app window after a browser download, drag FenyiDic into Applications first, then run `sudo /usr/bin/xattr -dr com.apple.quarantine "/Applications/FenyiDic.app"` in Terminal and reopen the app

@@ -78,6 +78,14 @@ FenyiDic 使用 FSRS 安排复习进度，并允许为不同标签指定不同�
 
 > **安装提示：** 首次安装 FenyiDic 以及后续安装新版本后，都需要前往“系统设置 > 隐私与安全性”，点击“仍要打开”（Open Anyway），然后重新打开 FenyiDic。
 
+如果通过浏览器下载后 macOS 提示应用已损坏、无法验证开发者，或点击后只显示 Dock 图标没有窗口，请先将 FenyiDic 拖入“应用程序”，再在终端执行：
+
+```bash
+sudo /usr/bin/xattr -dr com.apple.quarantine "/Applications/FenyiDic.app"
+```
+
+然后重新打开 FenyiDic。
+
 ## 词典数据
 
 本仓库和应用安装包不包含任何第三方词典数据，也不会随软件分发 MDX/MDD 文件。

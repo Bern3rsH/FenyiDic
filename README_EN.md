@@ -78,6 +78,14 @@ Current releases are available for both Apple Silicon and Intel Macs:
 
 > **Installation notice:** After the first installation of FenyiDic and after installing each subsequent update, open System Settings > Privacy & Security, click Open Anyway, and then reopen FenyiDic.
 
+If macOS says the app is damaged, cannot verify the developer, or only shows the Dock icon with no app window after a browser download, drag FenyiDic into Applications first, then run this command in Terminal:
+
+```bash
+sudo /usr/bin/xattr -dr com.apple.quarantine "/Applications/FenyiDic.app"
+```
+
+Then reopen FenyiDic.
+
 ## Dictionary Data
 
 Neither this repository nor the application installer includes third-party dictionary data. MDX and MDD files are not distributed with the software.
