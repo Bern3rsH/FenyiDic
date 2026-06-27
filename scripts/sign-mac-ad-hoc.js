@@ -43,6 +43,8 @@ async function resynchronizeAdHocSignature(appPath) {
     '--force',
     '--sign',
     AD_HOC_IDENTITY,
+    '--pagesize',
+    ARM64_CODE_SIGNATURE_PAGE_SIZE,
     '--options',
     'runtime',
     '--entitlements',
