@@ -133,3 +133,13 @@
 ### English
 
 - Bug Fix: Fixed the issue where the app would get stuck and fail to open due to signing issues during startup
+
+## v1.2.5
+
+### 中文
+
+- 修复：继续修复 App 启动时因为签名等问题导致的卡住无法打开的问题
+
+### English
+
+- Bug Fix: Continued to fix the issue where the app would get stuck and fail to open due to signing issues during startup
