@@ -143,3 +143,13 @@
 ### English
 
 - Bug Fix: Continued to fix the issue where the app would get stuck and fail to open due to signing issues during startup
+
+## v1.2.6
+
+### 中文
+
+- 修复：关闭 ad-hoc 签名包中的 hardened runtime，恢复 macOS 设置中“仍要打开”的安装路径
+
+### English
+
+- Bug Fix: Disabled hardened runtime for ad-hoc signed builds to restore the macOS Open Anyway installation path
