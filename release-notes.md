@@ -123,3 +123,13 @@
 - Feature: Added support for manually entering word definitions during the reading process
 - Feature: Manual word definition input now supports English definitions
 - Feature: Added a safeguard when importing mdx files to prevent importing unsupported file types
+
+## v1.2.4
+
+### 中文
+
+- 修复：修复 App 启动时因为签名等问题导致的卡住无法打开的问题
+
+### English
+
+- Bug Fix: Fixed the issue where the app would get stuck and fail to open due to signing issues during startup
