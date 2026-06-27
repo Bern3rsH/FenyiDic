@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | [English](./README_EN.md)
 
-FenyiDic is a sense-based English dictionary for macOS that brings dictionary lookup, sense organization, guided intensive reading, and long-term review into one workflow.
+FenyiDic is a sense-based English dictionary desktop app that brings dictionary lookup, sense organization, guided intensive reading, and long-term review into one workflow.
 
 Instead of saving only a word, FenyiDic helps you keep the exact sense you need to learn. Tags determine whether that item should later be reviewed through reading, listening, speaking, spelling, or dictation.
 
@@ -72,11 +72,15 @@ The interface supports Simplified Chinese and English. Software update notes are
 
 ## Download And Installation
 
-Current releases are available for both Apple Silicon and Intel Macs:
+Current releases are available for Apple Silicon Macs, Intel Macs, and Windows x64:
+
+- macOS Apple Silicon: macOS 10.15 Catalina or later
+- macOS Intel: macOS 10.15 Catalina or later
+- Windows x64: Windows 10 or later. The Windows build has not been tested on a real Windows machine yet because no Windows device is currently available.
 
 - [GitHub Releases](https://github.com/Bern3rsH/FenyiDic/releases/latest)
 
-> **Installation notice:** After the first installation of FenyiDic and after installing each subsequent update, open System Settings > Privacy & Security, click Open Anyway, and then reopen FenyiDic.
+> **macOS installation notice:** After the first installation of FenyiDic and after installing each subsequent update, open System Settings > Privacy & Security, click Open Anyway, and then reopen FenyiDic.
 
 If macOS says the app is damaged, cannot verify the developer, or only shows the Dock icon with no app window after a browser download, drag FenyiDic into Applications first, then run this command in Terminal:
 
@@ -112,6 +116,7 @@ Production build:
 ```bash
 npm run build
 npm run dist:mac
+npm run dist:win
 ```
 
 Build the database from a local MDX file:

@@ -155,3 +155,15 @@
 
 - Bug Fix: Disabled hardened runtime for ad-hoc signed builds to restore the macOS Open Anyway installation path
 - Installation Note: If macOS says the app is damaged, cannot verify the developer, or only shows the Dock icon with no app window after a browser download, drag FenyiDic into Applications first, then run `sudo /usr/bin/xattr -dr com.apple.quarantine "/Applications/FenyiDic.app"` in Terminal and reopen the app
+
+## v1.2.7
+
+### 中文
+
+- 功能：增加了对于 Windows x64 的支持
+- 优化：优化 Readme 中对于安装需要打开安全设置的说明
+
+### English
+
+- Feature: Added support for Windows x64
+- Improvement: Optimized the README explanation for opening security settings during installation

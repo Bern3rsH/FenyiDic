@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | [English](./README_EN.md)
 
-FenyiDic 是一款面向英语学习的支持 macOS 的桌面分义词典，把查词、义项整理、辅助精读和长期复习放在同一个工作流中。
+FenyiDic 是一款面向英语学习的桌面分义词典，把查词、义项整理、辅助精读和长期复习放在同一个工作流中。
 
 它不只记录“这个单词”，而是帮助你保存真正需要学习的具体义项，并通过标签决定之后要用阅读、听力、口语、拼写还是听写来复习。
 
@@ -72,11 +72,15 @@ FenyiDic 使用 FSRS 安排复习进度，并允许为不同标签指定不同�
 
 ## 下载安装
 
-当前发布流程提供 macOS Apple Silicon 和 Intel 版本：
+当前发布流程提供 macOS Apple Silicon、macOS Intel 和 Windows x64 版本：
+
+- macOS Apple Silicon：macOS 10.15 Catalina 及以上
+- macOS Intel：macOS 10.15 Catalina 及以上
+- Windows x64：Windows 10 及以上（因暂时没有 Windows 机器，Windows 版本未经过真实设备测试）
 
 - [GitHub Releases](https://github.com/Bern3rsH/FenyiDic/releases/latest)
 
-> **安装提示：** 首次安装 FenyiDic 以及后续安装新版本后，都需要前往“系统设置 > 隐私与安全性”，点击“仍要打开”（Open Anyway），然后重新打开 FenyiDic。
+> **macOS 安装提示：** 首次安装 FenyiDic 以及后续安装新版本后，都需要前往“系统设置 > 隐私与安全性”，点击“仍要打开”（Open Anyway），然后重新打开 FenyiDic。
 
 如果通过浏览器下载后 macOS 提示应用已损坏、无法验证开发者，或点击后只显示 Dock 图标没有窗口，请先将 FenyiDic 拖入“应用程序”，再在终端执行：
 
@@ -112,6 +116,7 @@ npm run dev
 ```bash
 npm run build
 npm run dist:mac
+npm run dist:win
 ```
 
 从本地 MDX 生成数据库：

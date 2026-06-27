@@ -27,9 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare local release notes
-        run: node scripts/extract-release-notes.js --output "$RUNNER_TEMP/release-notes.md"
-
       - name: Check telemetry release configuration
         run: |
           if [ -n "$VITE_SENTRY_DSN" ]; then
@@ -58,6 +55,72 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN || secrets.VITE_SENTRY_DSN }}
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY || secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST || secrets.VITE_POSTHOG_HOST || 'https://us.i.posthog.com' }}
+
+  release-windows:
+    name: Build and publish Windows release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check telemetry release configuration
+        shell: bash
+        run: |
+          if [ -n "$VITE_SENTRY_DSN" ]; then
+            echo "Sentry telemetry: configured"
+          else
+            echo "Sentry telemetry: missing VITE_SENTRY_DSN"
+          fi
+
+          if [ -n "$VITE_POSTHOG_KEY" ]; then
+            echo "PostHog telemetry: configured"
+          else
+            echo "PostHog telemetry: missing VITE_POSTHOG_KEY"
+          fi
+
+          echo "PostHog host: ${VITE_POSTHOG_HOST:-https://us.i.posthog.com}"
+        env:
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN || secrets.VITE_SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY || secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST || secrets.VITE_POSTHOG_HOST }}
+
+      - name: Publish Windows artifacts to GitHub Releases
+        run: npm run release:win
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN || secrets.VITE_SENTRY_DSN }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY || secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST || secrets.VITE_POSTHOG_HOST || 'https://us.i.posthog.com' }}
+
+  apply-release-notes:
+    name: Apply local release notes
+    runs-on: ubuntu-latest
+    needs:
+      - release-mac
+      - release-windows
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare local release notes
+        run: node scripts/extract-release-notes.js --output "$RUNNER_TEMP/release-notes.md"
 
       - name: Apply local release notes
         run: |
