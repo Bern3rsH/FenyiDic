@@ -4,6 +4,7 @@ import ReviewWordFlipCard from './components/ReviewWordFlipCard'
 import ReadReviewPreparationList from './components/review/common/ReadReviewPreparationList'
 import './styles/index.css'
 import { getDefaultTagModeConfigs, normalizeTagModeConfigs } from './utils/tagModeConfigs'
+import { resolveReviewMode } from './utils/reviewMode'
 import type {
   ReviewMode,
   TagModeConfig,
@@ -30,8 +31,6 @@ type ReadPreparationListItem = {
   cardTypeLabel: '释义卡' | '词条卡'
   reviewTagName?: string
 }
-
-const LEGACY_LISTEN_TAG_ID = 19
 
 function pruneReviewItemsAfterArchive(
   reviewItems: ReviewCardItem[],
@@ -69,19 +68,6 @@ function pruneReviewItemsAfterArchive(
       }
     })
     .filter((reviewItem): reviewItem is ReviewCardItem => reviewItem !== null)
-}
-
-function resolveReviewMode(reviewItem: ReviewCardItem): ReviewMode | undefined {
-  if (reviewItem.reviewMode === 'listen') {
-    return 'listen'
-  }
-
-  const tags = reviewItem.tags || []
-  if (tags.some((tag) => tag.id === LEGACY_LISTEN_TAG_ID || tag.name.includes('听不懂'))) {
-    return 'listen'
-  }
-
-  return reviewItem.reviewMode
 }
 
 function getReviewItemKey(reviewItem: ReviewCardItem): string {

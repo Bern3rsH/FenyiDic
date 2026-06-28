@@ -167,3 +167,13 @@
 
 - Feature: Added support for Windows x64
 - Improvement: Optimized the README explanation for opening security settings during installation
+
+## v1.2.8
+
+### 中文
+
+- 修复：修复了同一个释义的打多个标签可能导致复习模式错误的问题
+
+### English
+
+- Bug Fix: Fixed the issue where assigning multiple tags to the same definition could lead to incorrect review modes
