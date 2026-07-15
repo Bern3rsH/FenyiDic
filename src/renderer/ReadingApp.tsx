@@ -154,7 +154,7 @@ const READING_LOOKUP_AUDIO_VARIANT_LIMIT = 10
 const READING_BATCH_TAG_COLOR = '#6B7280'
 const LEGACY_READING_HISTORY_STORAGE_KEY = 'reading_history_records'
 const READING_HISTORY_STORAGE_KEY = 'reading_history_records_v2'
-const READING_HISTORY_LIMIT = 50
+const READING_HISTORY_MIGRATION_BACKUP_KEY = 'reading_history_records_v2_migrated_backup'
 const READING_HISTORY_TITLE_LENGTH = 48
 const SOFT_HYPHEN_PATTERN = /\u00AD/g
 const WINDOWS_NEWLINE_PATTERN = /\r\n?/g
@@ -846,39 +846,50 @@ function normalizeReadingHistoryRecord(value: unknown): ReadingHistoryRecord | n
   }
 }
 
-function loadReadingHistoryRecords(): ReadingHistoryRecord[] {
-  try {
-    window.localStorage.removeItem(LEGACY_READING_HISTORY_STORAGE_KEY)
+async function fetchReadingHistoryRecordsFromDatabase(): Promise<ReadingHistoryRecord[]> {
+  const rows = await window.api.listReadingRecords()
+  return rows
+    .map((row) => {
+      try {
+        return normalizeReadingHistoryRecord(JSON.parse(row.payload))
+      } catch (error) {
+        console.error('Parse reading record payload failed:', error)
+        return null
+      }
+    })
+    .filter((record): record is ReadingHistoryRecord => record !== null)
+    .sort((firstRecord, secondRecord) => secondRecord.updatedAt.localeCompare(firstRecord.updatedAt))
+}
 
+// 旧版本把阅读历史存在 localStorage；首次启动时迁移到 user.db。
+// 迁移成功后原数据改名保留为备份，避免中断导致丢失。
+async function migrateLegacyReadingHistoryRecords(): Promise<void> {
+  try {
     const rawRecords = window.localStorage.getItem(READING_HISTORY_STORAGE_KEY)
     if (!rawRecords) {
-      return []
+      return
     }
 
     const parsedRecords = JSON.parse(rawRecords)
-    if (!Array.isArray(parsedRecords)) {
-      return []
+    const records = Array.isArray(parsedRecords)
+      ? parsedRecords
+          .map(normalizeReadingHistoryRecord)
+          .filter((record): record is ReadingHistoryRecord => record !== null)
+      : []
+
+    for (const record of records) {
+      const result = await window.api.upsertReadingRecord(record)
+      if (!result.success) {
+        throw new Error(result.error || 'Upsert reading record failed')
+      }
     }
 
-    return parsedRecords
-      .map(normalizeReadingHistoryRecord)
-      .filter((record): record is ReadingHistoryRecord => record !== null)
-      .sort((firstRecord, secondRecord) => secondRecord.updatedAt.localeCompare(firstRecord.updatedAt))
-      .slice(0, READING_HISTORY_LIMIT)
+    window.localStorage.setItem(READING_HISTORY_MIGRATION_BACKUP_KEY, rawRecords)
+    window.localStorage.removeItem(READING_HISTORY_STORAGE_KEY)
+    window.localStorage.removeItem(LEGACY_READING_HISTORY_STORAGE_KEY)
+    console.log(`Migrated ${records.length} reading history records to database.`)
   } catch (error) {
-    console.error('Load reading history records failed:', error)
-    return []
-  }
-}
-
-function saveReadingHistoryRecords(records: ReadingHistoryRecord[]): void {
-  try {
-    window.localStorage.setItem(
-      READING_HISTORY_STORAGE_KEY,
-      JSON.stringify(records.slice(0, READING_HISTORY_LIMIT))
-    )
-  } catch (error) {
-    console.error('Save reading history records failed:', error)
+    console.error('Migrate reading history records failed:', error)
   }
 }
 
@@ -1551,15 +1562,21 @@ function ReadingStageHeader({
 function ReadingHistoryDrawer({
   isOpen,
   records,
+  transferNotice,
   onClose,
   onResume,
-  onDelete
+  onDelete,
+  onExport,
+  onImport
 }: {
   isOpen: boolean
   records: ReadingHistoryRecord[]
+  transferNotice: string | null
   onClose: () => void
   onResume: (record: ReadingHistoryRecord) => Promise<void> | void
   onDelete: (recordId: string) => Promise<void> | void
+  onExport: () => Promise<void> | void
+  onImport: () => Promise<void> | void
 }) {
   useBodyScrollLock(isOpen)
   const { translate } = useLocalization()
@@ -1581,6 +1598,27 @@ function ReadingHistoryDrawer({
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 关闭阅读窗口后，会保存到这里，可继续阅读或回顾已完成内容。
               </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onExport()}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800"
+                >
+                  导出 JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onImport()}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800"
+                >
+                  导入 JSON
+                </button>
+              </div>
+
+              {transferNotice && (
+                <div className="mt-2 break-all text-xs leading-5 text-blue-600">{transferNotice}</div>
+              )}
             </div>
 
             <button
@@ -1776,9 +1814,8 @@ export default function ReadingApp() {
   const [readingAutoPlay, setReadingAutoPlay] = useState(false)
   const [readingAutoPlayAccent, setReadingAutoPlayAccent] = useState<'uk' | 'us'>('uk')
   const [readingSessionId, setReadingSessionId] = useState<string | null>(null)
-  const [readingHistoryRecords, setReadingHistoryRecords] = useState<ReadingHistoryRecord[]>(
-    () => loadReadingHistoryRecords()
-  )
+  const [readingHistoryRecords, setReadingHistoryRecords] = useState<ReadingHistoryRecord[]>([])
+  const [historyTransferNotice, setHistoryTransferNotice] = useState<string | null>(null)
   const [markedTokenEntries, setMarkedTokenEntries] = useState<MarkedReadingTokenEntry[]>([])
   const [lookupPanelState, setLookupPanelState] = useState<LookupPanelState>(() => createIdleLookupPanelState())
   const [selectedSenseEntries, setSelectedSenseEntries] = useState<SelectedReadingSenseEntry[]>([])
@@ -1980,13 +2017,9 @@ export default function ReadingApp() {
       createdAt: readingSessionCreatedAt || updatedAt,
       updatedAt
     }
-    const existingRecords = loadReadingHistoryRecords()
-    const nextRecords = [
-      nextRecord,
-      ...existingRecords.filter((record) => record.id !== readingSessionId)
-    ]
-
-    saveReadingHistoryRecords(nextRecords)
+    // beforeunload 场景下窗口即将销毁：invoke 的响应可能收不到，
+    // 但消息已发出，主进程会完成落库
+    void window.api.upsertReadingRecord(nextRecord)
   }
 
   useEffect(() => {
@@ -2042,6 +2075,28 @@ export default function ReadingApp() {
       return nextEntryIds
     })
   }, [selectedSenseEntries])
+
+  useEffect(() => {
+    let isEffectActive = true
+
+    const initializeReadingHistory = async () => {
+      await migrateLegacyReadingHistoryRecords()
+      try {
+        const records = await fetchReadingHistoryRecordsFromDatabase()
+        if (isEffectActive) {
+          setReadingHistoryRecords(records)
+        }
+      } catch (error) {
+        console.error('Load reading history records failed:', error)
+      }
+    }
+
+    void initializeReadingHistory()
+
+    return () => {
+      isEffectActive = false
+    }
+  }, [])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -2965,10 +3020,46 @@ export default function ReadingApp() {
     setIsGuideDrawerOpen(true)
   }
 
+  const refreshReadingHistoryRecords = async () => {
+    try {
+      setReadingHistoryRecords(await fetchReadingHistoryRecordsFromDatabase())
+    } catch (error) {
+      console.error('Load reading history records failed:', error)
+    }
+  }
+
   const handleOpenHistoryDrawer = () => {
-    setReadingHistoryRecords(loadReadingHistoryRecords())
+    setHistoryTransferNotice(null)
+    void refreshReadingHistoryRecords()
     setIsGuideDrawerOpen(false)
     setIsHistoryDrawerOpen(true)
+  }
+
+  const handleExportReadingHistory = async () => {
+    const result = await window.api.exportReadingRecords()
+    if (result.canceled) {
+      return
+    }
+
+    setHistoryTransferNotice(
+      result.success
+        ? `已导出 ${result.count} 条记录到 ${result.filePath}`
+        : `导出失败：${result.error || '未知错误'}`
+    )
+  }
+
+  const handleImportReadingHistory = async () => {
+    const result = await window.api.importReadingRecords()
+    if (result.canceled) {
+      return
+    }
+
+    if (result.success) {
+      setHistoryTransferNotice(`导入完成：新增/更新 ${result.imported} 条，跳过 ${result.skipped} 条`)
+      void refreshReadingHistoryRecords()
+    } else {
+      setHistoryTransferNotice(`导入失败：${result.error || '未知错误'}`)
+    }
   }
 
   const handleResumeReadingHistoryRecord = async (record: ReadingHistoryRecord) => {
@@ -3027,11 +3118,10 @@ export default function ReadingApp() {
       return
     }
 
-    setReadingHistoryRecords((currentRecords) => {
-      const nextRecords = currentRecords.filter((record) => record.id !== recordId)
-      saveReadingHistoryRecords(nextRecords)
-      return nextRecords
-    })
+    void window.api.deleteReadingRecord(recordId)
+    setReadingHistoryRecords((currentRecords) =>
+      currentRecords.filter((record) => record.id !== recordId)
+    )
 
     if (recordId === readingSessionId) {
       setReadingSessionId(null)
@@ -3052,9 +3142,12 @@ export default function ReadingApp() {
     <ReadingHistoryDrawer
       isOpen={isHistoryDrawerOpen}
       records={readingHistoryRecords}
+      transferNotice={historyTransferNotice}
       onClose={() => setIsHistoryDrawerOpen(false)}
       onResume={handleResumeReadingHistoryRecord}
       onDelete={handleDeleteReadingHistoryRecord}
+      onExport={handleExportReadingHistory}
+      onImport={handleImportReadingHistory}
     />
   )
 

@@ -17,7 +17,10 @@ import {
   UpdateCustomEntryPayload,
   DeleteCustomEntryPayload,
   DeleteCustomWordPayload,
-  ImportItem
+  ImportItem,
+  ReadingRecordRow,
+  ReadingRecordsExportResult,
+  ReadingRecordsImportResult
 } from '../../shared/types'
 import { getAudio, initMdd, disposeMdd } from '../services/mdd-service'
 import {
@@ -36,6 +39,7 @@ import {
   recordReview,
   getCardStats
 } from '../services/fsrs-service'
+import { readFileSync, writeFileSync } from 'fs'
 import Store from 'electron-store'
 import { captureTelemetryEvent } from '../telemetry'
 
@@ -80,6 +84,46 @@ const MAX_CUSTOM_DEFINITION_EN_LENGTH = 4000
 const MAX_CUSTOM_DEFINITION_CN_LENGTH = 4000
 const MAX_CUSTOM_EXAMPLE_EN_LENGTH = 1000
 const MAX_CUSTOM_EXAMPLE_CN_LENGTH = 2000
+
+const READING_RECORDS_EXPORT_VERSION = 1
+
+function normalizeReadingRecordForStorage(record: unknown): ReadingRecordRow | null {
+  if (!record || typeof record !== 'object') {
+    return null
+  }
+
+  const value = record as Record<string, unknown>
+  if (typeof value.id !== 'string' || value.id.trim().length === 0) {
+    return null
+  }
+
+  const fallbackTimestamp = new Date().toISOString()
+  const createdAt = typeof value.createdAt === 'string' && value.createdAt ? value.createdAt : fallbackTimestamp
+  const updatedAt = typeof value.updatedAt === 'string' && value.updatedAt ? value.updatedAt : createdAt
+  const title = typeof value.title === 'string' ? value.title : ''
+
+  return {
+    id: value.id,
+    title,
+    payload: JSON.stringify(record),
+    createdAt,
+    updatedAt
+  }
+}
+
+function upsertReadingRecordRow(row: ReadingRecordRow): void {
+  const database = getDatabase()
+  database
+    .prepare(
+      `INSERT INTO user_db.reading_records (id, title, payload, created_at, updated_at)
+       VALUES (@id, @title, @payload, @createdAt, @updatedAt)
+       ON CONFLICT(id) DO UPDATE SET
+         title = excluded.title,
+         payload = excluded.payload,
+         updated_at = excluded.updated_at`
+    )
+    .run(row)
+}
 
 export function getStoredAppLanguage(): StoreSchema['appLanguage'] {
   return store.get(APP_LANGUAGE_SETTING_KEY)
@@ -2494,6 +2538,172 @@ export function registerIpcHandlers(): void {
     }
     return { success: true }
   })
+
+  // ============ 阅读记录 ============
+
+  ipcMain.handle(IPC_CHANNELS.READING_RECORDS_LIST, (): ReadingRecordRow[] => {
+    const database = getDatabase()
+    return database
+      .prepare(
+        `SELECT id, title, payload, created_at AS createdAt, updated_at AS updatedAt
+         FROM user_db.reading_records
+         ORDER BY updated_at DESC`
+      )
+      .all() as ReadingRecordRow[]
+  })
+
+  ipcMain.handle(IPC_CHANNELS.READING_RECORDS_UPSERT, (_event, record: unknown) => {
+    const normalized = normalizeReadingRecordForStorage(record)
+    if (!normalized) {
+      return { success: false, error: 'Invalid reading record' }
+    }
+
+    try {
+      upsertReadingRecordRow(normalized)
+      return { success: true }
+    } catch (error) {
+      console.error('Upsert reading record failed:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.READING_RECORDS_DELETE, (_event, recordId: string) => {
+    if (typeof recordId !== 'string' || !recordId) {
+      return { success: false, error: 'Invalid record id' }
+    }
+
+    try {
+      const database = getDatabase()
+      database.prepare('DELETE FROM user_db.reading_records WHERE id = ?').run(recordId)
+      return { success: true }
+    } catch (error) {
+      console.error('Delete reading record failed:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.READING_RECORDS_EXPORT,
+    async (event): Promise<ReadingRecordsExportResult> => {
+      try {
+        const database = getDatabase()
+        const rows = database
+          .prepare('SELECT payload FROM user_db.reading_records ORDER BY updated_at DESC')
+          .all() as Array<{ payload: string }>
+
+        if (rows.length === 0) {
+          return { success: false, error: '没有可导出的阅读记录' }
+        }
+
+        const senderWindow = BrowserWindow.fromWebContents(event.sender)
+        const defaultFileName = `fenyidic-reading-records-${new Date().toISOString().slice(0, 10)}.json`
+        const saveResult = senderWindow
+          ? await dialog.showSaveDialog(senderWindow, {
+              title: '导出阅读记录',
+              defaultPath: defaultFileName,
+              filters: [{ name: 'JSON', extensions: ['json'] }]
+            })
+          : await dialog.showSaveDialog({
+              title: '导出阅读记录',
+              defaultPath: defaultFileName,
+              filters: [{ name: 'JSON', extensions: ['json'] }]
+            })
+
+        if (saveResult.canceled || !saveResult.filePath) {
+          return { success: false, canceled: true }
+        }
+
+        const records = rows
+          .map((row) => {
+            try {
+              return JSON.parse(row.payload)
+            } catch {
+              return null
+            }
+          })
+          .filter((record) => record !== null)
+
+        const exportContent = {
+          type: 'fenyidic-reading-records',
+          version: READING_RECORDS_EXPORT_VERSION,
+          exportedAt: new Date().toISOString(),
+          records
+        }
+
+        writeFileSync(saveResult.filePath, JSON.stringify(exportContent, null, 2), 'utf-8')
+        return { success: true, count: records.length, filePath: saveResult.filePath }
+      } catch (error) {
+        console.error('Export reading records failed:', error)
+        return { success: false, error: String(error) }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.READING_RECORDS_IMPORT,
+    async (event): Promise<ReadingRecordsImportResult> => {
+      try {
+        const senderWindow = BrowserWindow.fromWebContents(event.sender)
+        const openOptions = {
+          title: '导入阅读记录',
+          properties: ['openFile'] as Array<'openFile'>,
+          filters: [{ name: 'JSON', extensions: ['json'] }]
+        }
+        const openResult = senderWindow
+          ? await dialog.showOpenDialog(senderWindow, openOptions)
+          : await dialog.showOpenDialog(openOptions)
+
+        if (openResult.canceled || openResult.filePaths.length === 0) {
+          return { success: false, canceled: true }
+        }
+
+        const rawContent = readFileSync(openResult.filePaths[0], 'utf-8')
+        const parsedContent = JSON.parse(rawContent)
+        const candidateRecords = Array.isArray(parsedContent)
+          ? parsedContent
+          : Array.isArray(parsedContent?.records)
+            ? parsedContent.records
+            : null
+
+        if (!candidateRecords) {
+          return { success: false, error: '文件格式不正确：找不到阅读记录数组' }
+        }
+
+        const database = getDatabase()
+        const selectExisting = database.prepare(
+          'SELECT updated_at AS updatedAt FROM user_db.reading_records WHERE id = ?'
+        )
+
+        let imported = 0
+        let skipped = 0
+
+        const importAll = database.transaction(() => {
+          for (const candidate of candidateRecords) {
+            const normalized = normalizeReadingRecordForStorage(candidate)
+            if (!normalized) {
+              skipped += 1
+              continue
+            }
+
+            const existing = selectExisting.get(normalized.id) as { updatedAt: string } | undefined
+            if (existing && existing.updatedAt >= normalized.updatedAt) {
+              skipped += 1
+              continue
+            }
+
+            upsertReadingRecordRow(normalized)
+            imported += 1
+          }
+        })
+        importAll()
+
+        return { success: true, imported, skipped }
+      } catch (error) {
+        console.error('Import reading records failed:', error)
+        return { success: false, error: String(error) }
+      }
+    }
+  )
 
   // ============ 词典管理 ============
 

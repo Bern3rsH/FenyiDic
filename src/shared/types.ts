@@ -380,6 +380,13 @@ export const IPC_CHANNELS = {
   // 复习窗口
   OPEN_REVIEW_WINDOW: 'review:openWindow',
   OPEN_READING_WINDOW: 'reading:openWindow',
+
+  // 阅读记录（存储于 user.db）
+  READING_RECORDS_LIST: 'readingRecords:list',
+  READING_RECORDS_UPSERT: 'readingRecords:upsert',
+  READING_RECORDS_DELETE: 'readingRecords:delete',
+  READING_RECORDS_EXPORT: 'readingRecords:export',
+  READING_RECORDS_IMPORT: 'readingRecords:import',
   NAVIGATE_TO_WORD: 'review:navigateWord',
   GET_REVIEW_SENSES: 'review:getSenses',
   GET_REVIEW_WORDS: 'review:getWords',
@@ -405,4 +412,29 @@ export interface ImportItem {
   definitionCn?: string
   grammar?: string
   examples?: string
+}
+
+// 阅读记录：主进程只负责存取，完整内容以 JSON 形式保存在 payload 中
+export interface ReadingRecordRow {
+  id: string
+  title: string
+  payload: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ReadingRecordsExportResult {
+  success: boolean
+  canceled?: boolean
+  count?: number
+  filePath?: string
+  error?: string
+}
+
+export interface ReadingRecordsImportResult {
+  success: boolean
+  canceled?: boolean
+  imported?: number
+  skipped?: number
+  error?: string
 }

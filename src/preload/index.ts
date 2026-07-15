@@ -22,7 +22,10 @@ import {
   DeleteCustomWordResult,
   AppUpdateCheckResult,
   TelemetryEventName,
-  TelemetryEventProperties
+  TelemetryEventProperties,
+  ReadingRecordRow,
+  ReadingRecordsExportResult,
+  ReadingRecordsImportResult
 } from '../shared/types'
 
 export type IpcApi = {
@@ -88,6 +91,13 @@ export type IpcApi = {
   // 用户设置
   getSetting: <T>(key: string) => Promise<T>
   setSetting: <T>(key: string, value: T) => Promise<{ success: boolean }>
+
+  // 阅读记录
+  listReadingRecords: () => Promise<ReadingRecordRow[]>
+  upsertReadingRecord: (record: unknown) => Promise<{ success: boolean; error?: string }>
+  deleteReadingRecord: (recordId: string) => Promise<{ success: boolean; error?: string }>
+  exportReadingRecords: () => Promise<ReadingRecordsExportResult>
+  importReadingRecords: () => Promise<ReadingRecordsImportResult>
 
   // 软件更新
   getAppVersion: () => Promise<string>
@@ -189,6 +199,13 @@ const api: IpcApi = {
   // 用户设置
   getSetting: (key) => ipcRenderer.invoke(IPC_CHANNELS.GET_SETTING, key),
   setSetting: (key, value) => ipcRenderer.invoke(IPC_CHANNELS.SET_SETTING, key, value),
+
+  // 阅读记录
+  listReadingRecords: () => ipcRenderer.invoke(IPC_CHANNELS.READING_RECORDS_LIST),
+  upsertReadingRecord: (record) => ipcRenderer.invoke(IPC_CHANNELS.READING_RECORDS_UPSERT, record),
+  deleteReadingRecord: (recordId) => ipcRenderer.invoke(IPC_CHANNELS.READING_RECORDS_DELETE, recordId),
+  exportReadingRecords: () => ipcRenderer.invoke(IPC_CHANNELS.READING_RECORDS_EXPORT),
+  importReadingRecords: () => ipcRenderer.invoke(IPC_CHANNELS.READING_RECORDS_IMPORT),
 
   // 软件更新
   getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_VERSION),

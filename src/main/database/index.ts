@@ -56,6 +56,31 @@ function initCustomEntryTables(tablePrefix: 'user_db.' | ''): void {
   `)
 }
 
+function initReadingRecordTables(tablePrefix: 'user_db.' | ''): void {
+  if (!db) return
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ${tablePrefix}reading_records (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `)
+
+  if (tablePrefix === 'user_db.') {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS user_db.idx_reading_records_updated_at ON reading_records(updated_at);
+    `)
+    return
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reading_records_updated_at ON reading_records(updated_at);
+  `)
+}
+
 function migrateArchivedTagName(tablePrefix: 'user_db.' | ''): void {
   if (!db) return
 
@@ -268,6 +293,7 @@ function initUserDatabaseOnly(userDbPath: string): void {
   `)
 
   initCustomEntryTables('')
+  initReadingRecordTables('')
 
   seedDefaultTags('')
   migrateArchivedTagName('')
@@ -319,7 +345,8 @@ function initUserTables(): void {
   `)
 
   initCustomEntryTables('user_db.')
-  
+  initReadingRecordTables('user_db.')
+
   // Try to add created_at column to sense_tags
   try {
     const columns = db.pragma('user_db.table_info(sense_tags)') as { name: string }[]
