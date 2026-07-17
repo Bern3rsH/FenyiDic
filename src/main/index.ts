@@ -1,10 +1,10 @@
 import './runtime-environment'
-import { app, shell, BrowserWindow, screen, ipcMain, Menu } from 'electron'
+import { app, shell, BrowserWindow, screen, ipcMain, Menu, nativeTheme } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './database'
-import { getStoredAppLanguage, registerIpcHandlers } from './ipc/handlers'
+import { applyStoredThemeMode, getStoredAppLanguage, registerIpcHandlers } from './ipc/handlers'
 import { initMdd } from './services/mdd-service'
 
 import { autoUpdater } from 'electron-updater'
@@ -336,8 +336,16 @@ function configureExternalLinks(window: BrowserWindow): void {
   })
 }
 
+function getWindowBackgroundColor(): string {
+  return nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f9fafb'
+}
+
 function getStartupLoadingDataUrl(): string {
   const startupText = STARTUP_LOADING_TEXT[getStoredAppLanguage()]
+  const useDarkColors = nativeTheme.shouldUseDarkColors
+  const startupColors = useDarkColors
+    ? { background: '#0f172a', text: '#94a3b8', spinnerTrack: '#334155' }
+    : { background: '#ffffff', text: '#6b7280', spinnerTrack: '#e5e7eb' }
   const startupDocument = `<!doctype html>
 <html lang="en">
   <head>
@@ -357,8 +365,8 @@ function getStartupLoadingDataUrl(): string {
         user-select: none;
         align-items: center;
         justify-content: center;
-        background: #ffffff;
-        color: #6b7280;
+        background: ${startupColors.background};
+        color: ${startupColors.text};
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .startup-loading {
@@ -370,7 +378,7 @@ function getStartupLoadingDataUrl(): string {
       .startup-spinner {
         width: 32px;
         height: 32px;
-        border: 2px solid #e5e7eb;
+        border: 2px solid ${startupColors.spinnerTrack};
         border-top-color: #3b82f6;
         border-radius: 9999px;
         animation: startup-spin 0.8s linear infinite;
@@ -436,6 +444,7 @@ function createReviewWindow(anchorWindow?: BrowserWindow): void {
     y: targetBounds.y,
     width: REVIEW_WINDOW_WIDTH,
     height: REVIEW_WINDOW_HEIGHT,
+    backgroundColor: getWindowBackgroundColor(),
     minWidth: 900,
     minHeight: 760,
     resizable: true,
@@ -499,6 +508,7 @@ function createReadingWindow(anchorWindow?: BrowserWindow): void {
     y: targetBounds.y,
     width: READING_WINDOW_WIDTH,
     height: READING_WINDOW_HEIGHT,
+    backgroundColor: getWindowBackgroundColor(),
     minWidth: 960,
     minHeight: 720,
     resizable: true,
@@ -532,6 +542,7 @@ function createMainWindow(): BrowserWindow {
     width: 1200,
     height: 800,
     show: false,
+    backgroundColor: getWindowBackgroundColor(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -617,6 +628,7 @@ if (!gotTheLock) {
   })
 
   configureApplicationMenu()
+  applyStoredThemeMode()
 
   try {
     console.log('Starting app initialization...')

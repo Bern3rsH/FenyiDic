@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, BrowserWindow } from 'electron'
+import { app, ipcMain, dialog, BrowserWindow, nativeTheme } from 'electron'
 import { spawn } from 'child_process'
 import { getDatabase, reinitDatabase } from '../database'
 import {
@@ -42,6 +42,7 @@ import { captureTelemetryEvent } from '../telemetry'
 // 用户设置存储
 interface StoreSchema {
   appLanguage: 'zh-CN' | 'en-US'
+  themeMode: 'light' | 'dark' | 'system'
   displayMode: 'en' | 'cn' | 'both'
   reviewAutoPlay: boolean
   reviewAutoPlayAccent: 'uk' | 'us'
@@ -55,6 +56,7 @@ interface StoreSchema {
 const store = new Store<StoreSchema>({
   defaults: {
     appLanguage: 'zh-CN',
+    themeMode: 'system',
     displayMode: 'both',
     reviewAutoPlay: false,
     reviewAutoPlayAccent: 'uk',
@@ -83,6 +85,20 @@ const MAX_CUSTOM_EXAMPLE_CN_LENGTH = 2000
 
 export function getStoredAppLanguage(): StoreSchema['appLanguage'] {
   return store.get(APP_LANGUAGE_SETTING_KEY)
+}
+
+const THEME_MODE_SETTING_KEY = 'themeMode'
+const THEME_MODE_VALUES = new Set(['light', 'dark', 'system'])
+
+export function getStoredThemeMode(): StoreSchema['themeMode'] {
+  const storedThemeMode = store.get(THEME_MODE_SETTING_KEY)
+  return THEME_MODE_VALUES.has(storedThemeMode) ? storedThemeMode : 'system'
+}
+
+// 通过 nativeTheme.themeSource 应用主题：所有窗口的 prefers-color-scheme
+// 会随之切换，渲染层的暗色样式（见 renderer/styles/index.css）自动生效。
+export function applyStoredThemeMode(): void {
+  nativeTheme.themeSource = getStoredThemeMode()
 }
 
 function restartAppAfterSettingChange(): void {
@@ -2489,6 +2505,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.SET_SETTING, (_event, key: string, value: any) => {
     const previousValue = store.get(key as keyof StoreSchema)
     store.set(key as keyof StoreSchema, value)
+    if (key === THEME_MODE_SETTING_KEY) {
+      applyStoredThemeMode()
+    }
     if (shouldRestartAfterSettingChange(key, previousValue, value)) {
       setTimeout(restartAppAfterSettingChange, 50)
     }

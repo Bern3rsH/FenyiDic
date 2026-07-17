@@ -193,3 +193,404 @@ body {
 .sense-card-idiom .example {
   @apply border-amber-300;
 }
+
+/* ============ 主题调色板（暗色模式支持） ============ */
+/*
+ * Tailwind 的 gray/slate/blue 等色系在 tailwind.config.js 中改为引用
+ * 下面的 --fd-* 变量。暗色模式下（prefers-color-scheme: dark，由主进程
+ * 通过 nativeTheme.themeSource 控制）整套调色板翻转，
+ * 所有工具类（含 hover:、透明度后缀等变体）自动生效。
+ */
+:root {
+  color-scheme: light;
+  --fd-gray-50: 249 250 251;
+  --fd-gray-100: 243 244 246;
+  --fd-gray-200: 229 231 235;
+  --fd-gray-300: 209 213 219;
+  --fd-gray-400: 156 163 175;
+  --fd-gray-500: 107 114 128;
+  --fd-gray-600: 75 85 99;
+  --fd-gray-700: 55 65 81;
+  --fd-gray-800: 31 41 55;
+  --fd-gray-900: 17 24 39;
+  --fd-gray-950: 3 7 18;
+
+  --fd-slate-50: 248 250 252;
+  --fd-slate-100: 241 245 249;
+  --fd-slate-200: 226 232 240;
+  --fd-slate-300: 203 213 225;
+  --fd-slate-400: 148 163 184;
+  --fd-slate-500: 100 116 139;
+  --fd-slate-600: 71 85 105;
+  --fd-slate-700: 51 65 85;
+  --fd-slate-800: 30 41 59;
+  --fd-slate-900: 15 23 42;
+  --fd-slate-950: 2 6 23;
+
+  --fd-blue-50: 239 246 255;
+  --fd-blue-100: 219 234 254;
+  --fd-blue-200: 191 219 254;
+  --fd-blue-300: 147 197 253;
+  --fd-blue-400: 96 165 250;
+  --fd-blue-500: 59 130 246;
+  --fd-blue-600: 37 99 235;
+  --fd-blue-700: 29 78 216;
+  --fd-blue-800: 30 64 175;
+  --fd-blue-900: 30 58 138;
+  --fd-blue-950: 23 37 84;
+
+  --fd-red-50: 254 242 242;
+  --fd-red-100: 254 226 226;
+  --fd-red-200: 254 202 202;
+  --fd-red-300: 252 165 165;
+  --fd-red-400: 248 113 113;
+  --fd-red-500: 239 68 68;
+  --fd-red-600: 220 38 38;
+  --fd-red-700: 185 28 28;
+  --fd-red-800: 153 27 27;
+  --fd-red-900: 127 29 29;
+  --fd-red-950: 69 10 10;
+
+  --fd-yellow-50: 254 252 232;
+  --fd-yellow-100: 254 249 195;
+  --fd-yellow-200: 254 240 138;
+  --fd-yellow-300: 253 224 71;
+  --fd-yellow-400: 250 204 21;
+  --fd-yellow-500: 234 179 8;
+  --fd-yellow-600: 202 138 4;
+  --fd-yellow-700: 161 98 7;
+  --fd-yellow-800: 133 77 14;
+  --fd-yellow-900: 113 63 18;
+  --fd-yellow-950: 66 32 6;
+
+  --fd-amber-50: 255 251 235;
+  --fd-amber-100: 254 243 199;
+  --fd-amber-200: 253 230 138;
+  --fd-amber-300: 252 211 77;
+  --fd-amber-400: 251 191 36;
+  --fd-amber-500: 245 158 11;
+  --fd-amber-600: 217 119 6;
+  --fd-amber-700: 180 83 9;
+  --fd-amber-800: 146 64 14;
+  --fd-amber-900: 120 53 15;
+  --fd-amber-950: 69 26 3;
+
+  --fd-green-50: 240 253 244;
+  --fd-green-100: 220 252 231;
+  --fd-green-200: 187 247 208;
+  --fd-green-300: 134 239 172;
+  --fd-green-400: 74 222 128;
+  --fd-green-500: 34 197 94;
+  --fd-green-600: 22 163 74;
+  --fd-green-700: 21 128 61;
+  --fd-green-800: 22 101 52;
+  --fd-green-900: 20 83 45;
+  --fd-green-950: 5 46 22;
+
+  --fd-emerald-50: 236 253 245;
+  --fd-emerald-100: 209 250 229;
+  --fd-emerald-200: 167 243 208;
+  --fd-emerald-300: 110 231 183;
+  --fd-emerald-400: 52 211 153;
+  --fd-emerald-500: 16 185 129;
+  --fd-emerald-600: 5 150 105;
+  --fd-emerald-700: 4 120 87;
+  --fd-emerald-800: 6 95 70;
+  --fd-emerald-900: 6 78 59;
+  --fd-emerald-950: 2 44 34;
+
+  --fd-indigo-50: 238 242 255;
+  --fd-indigo-100: 224 231 255;
+  --fd-indigo-200: 199 210 254;
+  --fd-indigo-300: 165 180 252;
+  --fd-indigo-400: 129 140 248;
+  --fd-indigo-500: 99 102 241;
+  --fd-indigo-600: 79 70 229;
+  --fd-indigo-700: 67 56 202;
+  --fd-indigo-800: 55 48 163;
+  --fd-indigo-900: 49 46 129;
+  --fd-indigo-950: 30 27 75;
+
+  --fd-violet-50: 245 243 255;
+  --fd-violet-100: 237 233 254;
+  --fd-violet-200: 221 214 254;
+  --fd-violet-300: 196 181 253;
+  --fd-violet-400: 167 139 250;
+  --fd-violet-500: 139 92 246;
+  --fd-violet-600: 124 58 237;
+  --fd-violet-700: 109 40 217;
+  --fd-violet-800: 91 33 182;
+  --fd-violet-900: 76 29 149;
+  --fd-violet-950: 46 16 101;
+
+  --fd-teal-50: 240 253 250;
+  --fd-teal-100: 204 251 241;
+  --fd-teal-200: 153 246 228;
+  --fd-teal-300: 94 234 212;
+  --fd-teal-400: 45 212 191;
+  --fd-teal-500: 20 184 166;
+  --fd-teal-600: 13 148 136;
+  --fd-teal-700: 15 118 110;
+  --fd-teal-800: 17 94 89;
+  --fd-teal-900: 19 78 74;
+  --fd-teal-950: 4 47 46;
+
+  --fd-sky-50: 240 249 255;
+  --fd-sky-100: 224 242 254;
+  --fd-sky-200: 186 230 253;
+  --fd-sky-300: 125 211 252;
+  --fd-sky-400: 56 189 248;
+  --fd-sky-500: 14 165 233;
+  --fd-sky-600: 2 132 199;
+  --fd-sky-700: 3 105 161;
+  --fd-sky-800: 7 89 133;
+  --fd-sky-900: 12 74 110;
+  --fd-sky-950: 8 47 73;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --app-scrollbar-thumb: rgba(148, 163, 184, 0.3);
+    --app-scrollbar-thumb-hover: rgba(148, 163, 184, 0.45);
+    --app-scrollbar-thumb-active: rgba(148, 163, 184, 0.58);
+
+    /* 暗色下的中性色：亮度整体反转（基于 slate 色阶） */
+    /* 强调色：浅色底翻转为深色底，中间调保持，深色文字调变亮 */
+    --fd-gray-50: 15 23 42;
+    --fd-gray-100: 44 57 82;
+    --fd-gray-200: 51 65 85;
+    --fd-gray-300: 71 85 105;
+    --fd-gray-400: 100 116 139;
+    --fd-gray-500: 148 163 184;
+    --fd-gray-600: 176 190 210;
+    --fd-gray-700: 203 213 225;
+    --fd-gray-800: 226 232 240;
+    --fd-gray-900: 241 245 249;
+    --fd-gray-950: 248 250 252;
+
+    --fd-slate-50: 15 23 42;
+    --fd-slate-100: 44 57 82;
+    --fd-slate-200: 51 65 85;
+    --fd-slate-300: 71 85 105;
+    --fd-slate-400: 100 116 139;
+    --fd-slate-500: 148 163 184;
+    --fd-slate-600: 176 190 210;
+    --fd-slate-700: 203 213 225;
+    --fd-slate-800: 226 232 240;
+    --fd-slate-900: 241 245 249;
+    --fd-slate-950: 248 250 252;
+
+    --fd-blue-50: 23 37 84;
+    --fd-blue-100: 30 58 138;
+    --fd-blue-200: 30 64 175;
+    --fd-blue-300: 29 78 216;
+    --fd-blue-400: 96 165 250;
+    --fd-blue-500: 59 130 246;
+    --fd-blue-600: 59 130 246;
+    --fd-blue-700: 96 165 250;
+    --fd-blue-800: 147 197 253;
+    --fd-blue-900: 191 219 254;
+    --fd-blue-950: 219 234 254;
+
+    --fd-red-50: 69 10 10;
+    --fd-red-100: 127 29 29;
+    --fd-red-200: 153 27 27;
+    --fd-red-300: 185 28 28;
+    --fd-red-400: 248 113 113;
+    --fd-red-500: 239 68 68;
+    --fd-red-600: 239 68 68;
+    --fd-red-700: 248 113 113;
+    --fd-red-800: 252 165 165;
+    --fd-red-900: 254 202 202;
+    --fd-red-950: 254 226 226;
+
+    --fd-yellow-50: 66 32 6;
+    --fd-yellow-100: 113 63 18;
+    --fd-yellow-200: 133 77 14;
+    --fd-yellow-300: 161 98 7;
+    --fd-yellow-400: 250 204 21;
+    --fd-yellow-500: 234 179 8;
+    --fd-yellow-600: 234 179 8;
+    --fd-yellow-700: 250 204 21;
+    --fd-yellow-800: 253 224 71;
+    --fd-yellow-900: 254 240 138;
+    --fd-yellow-950: 254 249 195;
+
+    --fd-amber-50: 69 26 3;
+    --fd-amber-100: 120 53 15;
+    --fd-amber-200: 146 64 14;
+    --fd-amber-300: 180 83 9;
+    --fd-amber-400: 251 191 36;
+    --fd-amber-500: 245 158 11;
+    --fd-amber-600: 245 158 11;
+    --fd-amber-700: 251 191 36;
+    --fd-amber-800: 252 211 77;
+    --fd-amber-900: 253 230 138;
+    --fd-amber-950: 254 243 199;
+
+    --fd-green-50: 5 46 22;
+    --fd-green-100: 20 83 45;
+    --fd-green-200: 22 101 52;
+    --fd-green-300: 21 128 61;
+    --fd-green-400: 74 222 128;
+    --fd-green-500: 34 197 94;
+    --fd-green-600: 34 197 94;
+    --fd-green-700: 74 222 128;
+    --fd-green-800: 134 239 172;
+    --fd-green-900: 187 247 208;
+    --fd-green-950: 220 252 231;
+
+    --fd-emerald-50: 2 44 34;
+    --fd-emerald-100: 6 78 59;
+    --fd-emerald-200: 6 95 70;
+    --fd-emerald-300: 4 120 87;
+    --fd-emerald-400: 52 211 153;
+    --fd-emerald-500: 16 185 129;
+    --fd-emerald-600: 16 185 129;
+    --fd-emerald-700: 52 211 153;
+    --fd-emerald-800: 110 231 183;
+    --fd-emerald-900: 167 243 208;
+    --fd-emerald-950: 209 250 229;
+
+    --fd-indigo-50: 30 27 75;
+    --fd-indigo-100: 49 46 129;
+    --fd-indigo-200: 55 48 163;
+    --fd-indigo-300: 67 56 202;
+    --fd-indigo-400: 129 140 248;
+    --fd-indigo-500: 99 102 241;
+    --fd-indigo-600: 99 102 241;
+    --fd-indigo-700: 129 140 248;
+    --fd-indigo-800: 165 180 252;
+    --fd-indigo-900: 199 210 254;
+    --fd-indigo-950: 224 231 255;
+
+    --fd-violet-50: 46 16 101;
+    --fd-violet-100: 76 29 149;
+    --fd-violet-200: 91 33 182;
+    --fd-violet-300: 109 40 217;
+    --fd-violet-400: 167 139 250;
+    --fd-violet-500: 139 92 246;
+    --fd-violet-600: 139 92 246;
+    --fd-violet-700: 167 139 250;
+    --fd-violet-800: 196 181 253;
+    --fd-violet-900: 221 214 254;
+    --fd-violet-950: 237 233 254;
+
+    --fd-teal-50: 4 47 46;
+    --fd-teal-100: 19 78 74;
+    --fd-teal-200: 17 94 89;
+    --fd-teal-300: 15 118 110;
+    --fd-teal-400: 45 212 191;
+    --fd-teal-500: 20 184 166;
+    --fd-teal-600: 20 184 166;
+    --fd-teal-700: 45 212 191;
+    --fd-teal-800: 94 234 212;
+    --fd-teal-900: 153 246 228;
+    --fd-teal-950: 204 251 241;
+
+    --fd-sky-50: 8 47 73;
+    --fd-sky-100: 12 74 110;
+    --fd-sky-200: 7 89 133;
+    --fd-sky-300: 3 105 161;
+    --fd-sky-400: 56 189 248;
+    --fd-sky-500: 14 165 233;
+    --fd-sky-600: 14 165 233;
+    --fd-sky-700: 56 189 248;
+    --fd-sky-800: 125 211 252;
+    --fd-sky-900: 186 230 253;
+    --fd-sky-950: 224 242 254;
+  }
+
+  body {
+    background-color: #0f172a;
+  }
+
+  /* white 不整体翻转（text-white 需保持白色），
+     仅将白色背景类映射为暗色表面 */
+  .bg-white {
+    background-color: rgb(30 41 59 / var(--tw-bg-opacity, 1));
+  }
+
+  .bg-white\/50 {
+    background-color: rgb(30 41 59 / 0.5);
+  }
+
+  .bg-white\/85 {
+    background-color: rgb(30 41 59 / 0.85);
+  }
+
+  .bg-white\/95 {
+    background-color: rgb(30 41 59 / 0.95);
+  }
+
+  /* Switch thumbs and recording indicators are foreground marks, not surfaces. */
+  .fd-white-indicator {
+    background-color: white;
+  }
+
+  /* Keep small blue labels above WCAG AA contrast on dark blue surfaces. */
+  .bg-blue-50.text-blue-600,
+  .bg-blue-100.text-blue-600,
+  .bg-blue-100.text-blue-700 {
+    color: rgb(var(--fd-blue-800) / var(--tw-text-opacity, 1));
+  }
+
+  .hover\:bg-white:hover,
+  .focus\:bg-white:focus {
+    background-color: rgb(30 41 59);
+  }
+
+  .border-white\/70 {
+    border-color: rgb(51 65 85 / 0.7);
+  }
+
+  /* 遮罩层在暗色下保持深色（slate-900/950 变量已翻转为浅色，需固定） */
+  .bg-slate-900\/20 {
+    background-color: rgb(2 6 23 / 0.5);
+  }
+
+  .bg-slate-950\/30 {
+    background-color: rgb(2 6 23 / 0.6);
+  }
+
+  /* 悬浮提示与通知条在暗色下用略浅的深色表面，保持白色文字可读 */
+  .bg-gray-800\/90 {
+    background-color: rgb(51 65 85 / 0.95);
+  }
+
+  /* index.css 内 @apply bg-white 的自定义组件 */
+  .sense-card {
+    background-color: rgb(30 41 59);
+  }
+
+  .search-input {
+    background-color: rgb(15 23 42);
+  }
+
+  .favorite-btn,
+  .favorite-btn.active,
+  .favorite-btn.active:hover,
+  .favorite-btn.is-tag-active,
+  .favorite-btn.is-tag-active:hover,
+  .favorite-btn.is-archive-active,
+  .favorite-btn.is-archive-active:hover,
+  .favorite-btn.is-note-active,
+  .favorite-btn.is-note-active:hover,
+  .favorite-btn.is-example-active,
+  .favorite-btn.is-example-active:hover,
+  .favorite-btn.is-menu-active,
+  .favorite-btn.is-menu-active:hover {
+    background-color: rgb(30 41 59);
+  }
+
+  .favorite-btn:hover {
+    background-color: rgb(44 57 82);
+  }
+
+  .favorite-btn[data-action-tooltip]::after,
+  .action-tooltip-trigger[data-action-tooltip]::after {
+    background: rgb(51 65 85);
+  }
+}

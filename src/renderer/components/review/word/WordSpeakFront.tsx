@@ -100,7 +100,7 @@ export default function WordSpeakFront({ headword, senses, onRecordingComplete }
           title={isRecording ? "停止录音" : "开始录音"}
         >
           {isRecording ? (
-             <div className="w-8 h-8 bg-white rounded-md animate-pulse" />
+             <div className="fd-white-indicator w-8 h-8 bg-white rounded-md animate-pulse" />
           ) : (
              <Mic className="h-10 w-10 text-white" aria-hidden="true" />
           )}

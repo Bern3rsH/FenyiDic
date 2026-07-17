@@ -7,6 +7,7 @@ import { useConfirmDialog } from './ConfirmDialog'
 
 type SettingSection = 'search' | 'review' | 'reading' | 'general'
 type DefinitionDisplayMode = 'en' | 'cn' | 'both'
+type ThemeMode = 'light' | 'dark' | 'system'
 
 interface SettingsProps {
   displayMode: DefinitionDisplayMode
@@ -57,6 +58,12 @@ const definitionDisplayModeOptions: Array<{ value: DefinitionDisplayMode; label:
   { value: 'both', label: '双语' }
 ]
 
+const themeModeOptions: Array<{ value: ThemeMode; label: string }> = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+  { value: 'system', label: '跟随系统' }
+]
+
 const appLanguageOptions: Array<{ value: AppLocale; labelKey: 'languageChinese' | 'languageEnglish' }> = [
   { value: 'zh-CN', labelKey: 'languageChinese' },
   { value: 'en-US', labelKey: 'languageEnglish' }
@@ -88,6 +95,7 @@ function Settings({
   const { locale, setLocale, t, translate } = useLocalization()
   const { confirm, DialogComponent } = useConfirmDialog()
   const [activeSection, setActiveSection] = useState<SettingSection>('search')
+  const [themeMode, setThemeMode] = useState<ThemeMode>('system')
   const [availableTagNames, setAvailableTagNames] = useState<string[]>([])
   const [openReviewConfigDropdownKey, setOpenReviewConfigDropdownKey] = useState<string | null>(null)
   const [feedbackEmailStatus, setFeedbackEmailStatus] = useState<'idle' | 'opening' | 'error'>('idle')
@@ -117,6 +125,35 @@ function Settings({
   useEffect(() => {
     setOpenReviewConfigDropdownKey(null)
   }, [activeSection])
+
+  useEffect(() => {
+    let isEffectActive = true
+
+    window.api
+      .getSetting<ThemeMode>('themeMode')
+      .then((storedThemeMode) => {
+        if (isEffectActive && themeModeOptions.some(({ value }) => value === storedThemeMode)) {
+          setThemeMode(storedThemeMode)
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load theme mode', error)
+      })
+
+    return () => {
+      isEffectActive = false
+    }
+  }, [])
+
+  const handleThemeModeChange = (nextThemeMode: ThemeMode) => {
+    if (nextThemeMode === themeMode) {
+      return
+    }
+
+    setThemeMode(nextThemeMode)
+    // 主进程会同步更新 nativeTheme.themeSource，所有窗口立即切换主题
+    void window.api.setSetting('themeMode', nextThemeMode)
+  }
 
   useEffect(() => {
     if (activeSection !== 'review') {
@@ -331,7 +368,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         searchAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -530,7 +567,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         reviewAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -611,7 +648,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         readingAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -654,6 +691,32 @@ function Settings({
 
             {activeSection === 'general' && (
               <div className="space-y-6">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">外观</div>
+                      <div className="mt-1 text-sm text-gray-500">选择浅色、深色或跟随系统外观</div>
+                    </div>
+
+                    <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
+                      {themeModeOptions.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleThemeModeChange(value)}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                            themeMode === value
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-900'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
