@@ -70,6 +70,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "FenyiDic"
     },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    },
     "protocols": [
       {
         "name": "FenyiDic",

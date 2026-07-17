@@ -43,5 +43,10 @@ assert.equal(
   true,
   'NSIS installer must allow changing installation directory'
 )
+assert.equal(
+  packageJson.build?.portable?.artifactName,
+  '${productName}-${version}-${arch}-portable.${ext}',
+  'portable artifact name must not collide with the NSIS installer exe'
+)
 
 console.log('windows release target assertions passed')
