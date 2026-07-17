@@ -355,6 +355,9 @@ body {
     --app-scrollbar-thumb: rgba(148, 163, 184, 0.3);
     --app-scrollbar-thumb-hover: rgba(148, 163, 184, 0.45);
     --app-scrollbar-thumb-active: rgba(148, 163, 184, 0.58);
+    --fd-settings-nav-hover-bg: 30 41 59;
+    --fd-settings-nav-hover-border: 71 85 105;
+    --fd-reading-input-bg: 15 23 42;
 
     /* 暗色下的中性色：亮度整体反转（基于 slate 色阶） */
     /* 强调色：浅色底翻转为深色底，中间调保持，深色文字调变亮 */
@@ -540,6 +543,16 @@ body {
   .hover\:bg-white:hover,
   .focus\:bg-white:focus {
     background-color: rgb(30 41 59);
+  }
+
+  .settings-section-button:not([aria-current='page']):hover {
+    background-color: rgb(var(--fd-settings-nav-hover-bg));
+    border-color: rgb(var(--fd-settings-nav-hover-border));
+  }
+
+  .reading-input-textarea:not(:read-only),
+  .reading-input-textarea:not(:read-only):focus {
+    background-color: rgb(var(--fd-reading-input-bg));
   }
 
   .border-white\/70 {

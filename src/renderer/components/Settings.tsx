@@ -313,7 +313,8 @@ function Settings({
                   <button
                     key={id}
                     onClick={() => setActiveSection(id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`settings-section-button w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
                       isActive
                         ? 'bg-white border-blue-200 text-blue-700 shadow-sm'
                         : 'bg-transparent border-transparent text-gray-600 hover:bg-white hover:border-gray-200'

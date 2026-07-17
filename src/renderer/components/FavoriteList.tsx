@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type MouseEvent } from 'react'
-import { Check, Heart, Pencil, Tag } from 'lucide-react'
+import { Check, Heart, Pencil, Tag as TagIcon } from 'lucide-react'
 import SenseCard from './SenseCard'
 import Sidebar from './Sidebar'
 import TagSelector from './TagSelector'
@@ -1431,7 +1431,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
                                       key={tag.id}
                                       className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
                                     >
-                                      <Tag className="h-2.5 w-2.5" aria-hidden="true" />
+                                      <TagIcon className="h-2.5 w-2.5" aria-hidden="true" />
                                       {tag.name}
                                     </span>
                                   ))}
@@ -1469,7 +1469,7 @@ function FavoriteList({ displayMode = 'both', onWordSelect }: FavoriteListProps)
                                     data-action-tooltip="管理标签"
                                     aria-label="管理标签"
                                   >
-                                    <Tag className="h-4 w-4" aria-hidden="true" />
+                                    <TagIcon className="h-4 w-4" aria-hidden="true" />
                                   </button>
 
                                   <button

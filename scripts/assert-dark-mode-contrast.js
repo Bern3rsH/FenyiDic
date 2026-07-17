@@ -5,6 +5,7 @@ const fs = require('fs')
 const path = require('path')
 
 const MINIMUM_TEXT_CONTRAST = 4.5
+const MAXIMUM_DARK_SURFACE_LUMINANCE = 0.1
 const EXPECTED_SETTINGS_INDICATORS = 3
 
 function readSource(relativePath) {
@@ -38,6 +39,7 @@ function contrastRatio(firstColor, secondColor) {
 
 const cssSource = readSource('src/renderer/styles/index.css')
 const settingsSource = readSource('src/renderer/components/Settings.tsx')
+const readingSource = readSource('src/renderer/ReadingApp.tsx')
 const recordingSource = readSource('src/renderer/components/review/word/WordSpeakFront.tsx')
 
 const settingsIndicatorCount = (settingsSource.match(/fd-white-indicator/g) || []).length
@@ -53,6 +55,33 @@ assert(
 assert(
   /\.fd-white-indicator\s*{\s*background-color:\s*white;\s*}/m.test(cssSource),
   'Dark mode must restore white only for foreground indicators'
+)
+assert(
+  settingsSource.includes("aria-current={isActive ? 'page' : undefined}") &&
+    settingsSource.includes('settings-section-button w-full'),
+  'Settings navigation buttons must expose active state and the dark hover hook'
+)
+assert(
+  cssSource.includes(".settings-section-button:not([aria-current='page']):hover"),
+  'Inactive settings navigation buttons must define a dark-mode hover surface'
+)
+assert(
+  relativeLuminance(readLastRgbVariable(cssSource, 'fd-settings-nav-hover-bg')) <=
+    MAXIMUM_DARK_SURFACE_LUMINANCE,
+  'The settings navigation hover surface must remain dark'
+)
+assert(
+  readingSource.includes('reading-input-textarea min-h-[28rem]'),
+  'The reading text input must expose its dark surface hook'
+)
+assert(
+  cssSource.includes('.reading-input-textarea:not(:read-only):focus'),
+  'The focused reading text input must keep its dark surface'
+)
+assert(
+  relativeLuminance(readLastRgbVariable(cssSource, 'fd-reading-input-bg')) <=
+    MAXIMUM_DARK_SURFACE_LUMINANCE,
+  'The reading text input surface must remain dark'
 )
 
 for (const backgroundName of ['fd-blue-50', 'fd-blue-100']) {

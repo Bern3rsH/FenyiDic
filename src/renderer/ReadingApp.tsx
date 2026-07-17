@@ -4253,7 +4253,7 @@ export default function ReadingApp() {
             readOnly={isInputTextLocked}
             rows={READING_TEXTAREA_ROWS}
             placeholder="请输入或粘贴要阅读的英文原文"
-            className={`min-h-[28rem] w-full resize-none rounded-2xl border px-5 py-4 text-base leading-7 text-slate-700 outline-none transition ${
+            className={`reading-input-textarea min-h-[28rem] w-full resize-none rounded-2xl border px-5 py-4 text-base leading-7 text-slate-700 placeholder:text-slate-500 outline-none transition ${
               isInputTextLocked
                 ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
                 : 'border-slate-200 bg-slate-50 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50'

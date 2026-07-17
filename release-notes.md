@@ -191,3 +191,13 @@
 - Feature: Provided a ready-to-use ZIP package and a portable EXE version
 - Feature: Added a feedback entry in settings, allowing users to submit email feedback
 - Improvement: Introduced an icon library to resolve inconsistencies in icon styles within the app
+
+## v1.3.0
+
+### 中文
+
+- 功能：感谢 @D-Jiang 的贡献，增加了对于暗黑模式的支持
+
+### English
+
+- Feature: Thanks to @D-Jiang's contribution, added support for dark mode
