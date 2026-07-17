@@ -99,7 +99,7 @@ export default function WordSpeakFront({ headword, senses, onRecordingComplete }
           title={isRecording ? "停止录音" : "开始录音"}
         >
           {isRecording ? (
-             <div className="w-8 h-8 bg-white rounded-md animate-pulse" />
+             <div className="fd-white-indicator w-8 h-8 bg-white rounded-md animate-pulse" />
           ) : (
              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />

@@ -525,6 +525,18 @@ body {
     background-color: rgb(30 41 59 / 0.95);
   }
 
+  /* Switch thumbs and recording indicators are foreground marks, not surfaces. */
+  .fd-white-indicator {
+    background-color: white;
+  }
+
+  /* Keep small blue labels above WCAG AA contrast on dark blue surfaces. */
+  .bg-blue-50.text-blue-600,
+  .bg-blue-100.text-blue-600,
+  .bg-blue-100.text-blue-700 {
+    color: rgb(var(--fd-blue-800) / var(--tw-text-opacity, 1));
+  }
+
   .hover\:bg-white:hover,
   .focus\:bg-white:focus {
     background-color: rgb(30 41 59);

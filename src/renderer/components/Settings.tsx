@@ -344,7 +344,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         searchAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -560,7 +560,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         reviewAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -641,7 +641,7 @@ function Settings({
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`fd-white-indicator inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         readingAutoPlay ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
