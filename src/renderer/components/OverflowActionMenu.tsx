@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Ellipsis } from 'lucide-react'
 
 type OverflowActionMenuItemTone = 'default' | 'danger'
 
@@ -77,11 +78,7 @@ export default function OverflowActionMenu({
         aria-label={buttonTitle}
         aria-expanded={isOpen}
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="5" cy="12" r="1.6" />
-          <circle cx="12" cy="12" r="1.6" />
-          <circle cx="19" cy="12" r="1.6" />
-        </svg>
+        <Ellipsis className="h-4 w-4" aria-hidden="true" />
       </button>
 
       {isOpen && (

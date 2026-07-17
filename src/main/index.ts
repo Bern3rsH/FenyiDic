@@ -9,7 +9,7 @@ import { initMdd } from './services/mdd-service'
 
 import { autoUpdater } from 'electron-updater'
 import type { UpdateInfo } from 'electron-updater'
-import { IPC_CHANNELS } from '../shared/types'
+import { APP_FEEDBACK_EMAIL, IPC_CHANNELS } from '../shared/types'
 import { normalizeReleaseNotes } from './updateReleaseNotes'
 import { captureTelemetryEvent, initializeTelemetry } from './telemetry'
 import type {
@@ -24,6 +24,7 @@ autoUpdater.fullChangelog = false
 
 const APP_DISPLAY_NAME = 'FenyiDic'
 const LATEST_RELEASE_PAGE_URL = 'https://github.com/Bern3rsH/FenyiDic/releases/latest'
+const FEEDBACK_EMAIL_URL = `mailto:${APP_FEEDBACK_EMAIL}?subject=${encodeURIComponent('FenyiDic Feedback')}`
 const REVIEW_WINDOW_TITLES = {
   'zh-CN': '单词复习',
   'en-US': 'Word Review'
@@ -129,6 +130,20 @@ async function openLatestReleasePage(): Promise<{ success: boolean; error?: stri
   } catch (error) {
     const errorMessage = getErrorMessage(error)
     console.error('[Update] Failed to open latest release page:', errorMessage)
+    return {
+      success: false,
+      error: errorMessage
+    }
+  }
+}
+
+async function openFeedbackEmail(): Promise<{ success: boolean; error?: string }> {
+  try {
+    await shell.openExternal(FEEDBACK_EMAIL_URL)
+    return { success: true }
+  } catch (error) {
+    const errorMessage = getErrorMessage(error)
+    console.error('[Feedback] Failed to open default email client:', errorMessage)
     return {
       success: false,
       error: errorMessage
@@ -639,6 +654,7 @@ if (!gotTheLock) {
     ipcMain.handle(IPC_CHANNELS.GET_APP_VERSION, () => app.getVersion())
     ipcMain.handle(IPC_CHANNELS.CHECK_APP_UPDATE, () => checkForManualAppUpdate())
     ipcMain.handle(IPC_CHANNELS.OPEN_LATEST_RELEASE_PAGE, () => openLatestReleasePage())
+    ipcMain.handle(IPC_CHANNELS.OPEN_FEEDBACK_EMAIL, () => openFeedbackEmail())
 
     console.log('Loading main renderer...')
     await loadMainRenderer(mainWindow)

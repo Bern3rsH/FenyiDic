@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Check, Plus, X } from 'lucide-react'
 import { SYSTEM_TAGS } from '../../shared/types'
 import type { Tag } from '../../shared/types'
 import { useBodyScrollLock } from '../utils/scrollLock'
@@ -121,9 +122,7 @@ export default function BatchTagDialog({
             <p className="text-xs text-gray-400 mt-1">{description}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600" disabled={isSaving}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -146,13 +145,7 @@ export default function BatchTagDialog({
                   />
                   <span className="flex-1 text-left text-sm">{tag.name}</span>
                   {isSelected && (
-                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4A1 1 0 014.707 9.293L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <Check className="h-4 w-4 text-blue-600" aria-hidden="true" />
                   )}
                 </button>
               )
@@ -196,9 +189,7 @@ export default function BatchTagDialog({
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                 disabled={isSaving}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <Plus className="h-4 w-4" aria-hidden="true" />
                 新建标签
               </button>
             )

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Check, ChevronRight, Heart, Pencil, Plus, SquarePlus, Tag, X } from 'lucide-react'
 import { SYSTEM_TAGS } from '../shared/types'
 import type { SearchResultItem } from '../shared/types'
 import { useConfirmDialog } from './components/ConfirmDialog'
@@ -999,9 +1000,7 @@ function ReadingBatchTagDialog({ isOpen, onClose, onConfirm }: ReadingBatchTagDi
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-medium text-gray-800">批量添加标签</h3>
           <button onClick={onClose} className="text-gray-400 transition hover:text-gray-600">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -1026,13 +1025,7 @@ function ReadingBatchTagDialog({ isOpen, onClose, onConfirm }: ReadingBatchTagDi
                     >
                       <span className="flex-1 text-left">{tag.name}</span>
                       {isSelected && (
-                        <svg className="h-4 w-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <Check className="h-4 w-4 text-blue-600" aria-hidden="true" />
                       )}
                     </button>
                   )
@@ -1071,9 +1064,7 @@ function ReadingBatchTagDialog({ isOpen, onClose, onConfirm }: ReadingBatchTagDi
                   onClick={() => setIsCreating(true)}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                   新建标签
                 </button>
               )}
@@ -1588,9 +1579,7 @@ function ReadingHistoryDrawer({
               onClick={onClose}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -1712,9 +1701,7 @@ function ReadingGuideDrawer({
               onClick={onClose}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -3452,9 +3439,7 @@ export default function ReadingApp() {
                                 className="flex w-full items-center gap-3 px-3 py-3 text-left text-blue-700 transition hover:bg-blue-50"
                               >
                                 <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zM12 8v8m-4-4h8" />
-                                  </svg>
+                                  <SquarePlus className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <span className="min-w-0">
                                   <span className="block text-sm font-medium">手动输入</span>
@@ -3481,16 +3466,12 @@ export default function ReadingApp() {
                     >
                       <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-slate-400">
                         {isLookupWordDetailsExpanded ? '收起' : '展开'}
-                        <svg
+                        <ChevronRight
                           className={`h-3.5 w-3.5 transition-transform ${
                             isLookupWordDetailsExpanded ? 'rotate-90' : 'rotate-0'
                           }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                          aria-hidden="true"
+                        />
                       </span>
                     </button>
 
@@ -3514,9 +3495,7 @@ export default function ReadingApp() {
                                     key={tag.id}
                                     className="inline-flex min-w-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"
                                   >
-                                    <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                    </svg>
+                                    <Tag className="h-3 w-3 shrink-0" aria-hidden="true" />
                                     <span className="truncate">{tag.name}</span>
                                   </span>
                                 ))}
@@ -3534,19 +3513,7 @@ export default function ReadingApp() {
                                 data-action-tooltip={isLookupWordFavorited ? '取消收藏' : '收藏'}
                                 aria-label={isLookupWordFavorited ? '取消收藏' : '收藏'}
                               >
-                                <svg
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                                  />
-                                </svg>
+                                <Heart className="h-4 w-4" aria-hidden="true" />
                               </button>
 
                             <button
@@ -3560,14 +3527,7 @@ export default function ReadingApp() {
                               data-action-tooltip="管理标签"
                               aria-label="管理标签"
                             >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                              </svg>
+                              <Tag className="h-4 w-4" aria-hidden="true" />
                             </button>
 
                             <button
@@ -3596,14 +3556,7 @@ export default function ReadingApp() {
                               data-action-tooltip="添加/编辑笔记"
                               aria-label="添加/编辑笔记"
                             >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
                             </button>
                           </div>
                         </div>
@@ -3671,9 +3624,7 @@ export default function ReadingApp() {
                                   data-action-tooltip="编辑笔记"
                                   aria-label="编辑笔记"
                                 >
-                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                                 </button>
                               </div>
                             )}
@@ -3761,16 +3712,12 @@ export default function ReadingApp() {
                                 >
                                   {group.senses.length}
                                 </span>
-                                <svg
+                                <ChevronRight
                                   className={`h-4 w-4 shrink-0 transition-transform ${
                                     isCollapsed ? 'rotate-0' : 'rotate-90'
                                   } ${isCollapsed ? 'text-slate-400' : 'text-blue-500'}`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
+                                  aria-hidden="true"
+                                />
                               </button>
                             )}
 

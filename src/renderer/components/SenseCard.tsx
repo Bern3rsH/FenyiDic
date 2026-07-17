@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Heart, Pencil, Tag, Volume2 } from 'lucide-react'
 import { useConfirmDialog } from './ConfirmDialog'
 import OverflowActionMenu, { type OverflowActionMenuItem } from './OverflowActionMenu'
 import TagSelector from './TagSelector'
@@ -709,9 +710,7 @@ function SenseCard({
                   isCompact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-0.5 text-xs'
                 }`}
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
+                <Tag className="h-3 w-3" aria-hidden="true" />
                 {tag.name}
               </span>
             ))}
@@ -822,9 +821,7 @@ function SenseCard({
                                 data-action-tooltip="朗读例句"
                                 aria-label="朗读例句"
                               >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                </svg>
+                                <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
                               </button>
                             </div>
                           )}
@@ -843,9 +840,7 @@ function SenseCard({
                       <span className="min-w-0 truncate">
                         {translate(`展开更多例句 (${examples.length - maxExamples})`)}
                       </span>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ChevronDown className="h-3 w-3" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -864,14 +859,7 @@ function SenseCard({
               data-action-tooltip={isFavorited ? '取消收藏' : '收藏'}
               aria-label={isFavorited ? '取消收藏' : '收藏'}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
+              <Heart className="h-4 w-4" aria-hidden="true" />
             </button>
 
             {/* 标签按钮 */}
@@ -883,14 +871,7 @@ function SenseCard({
               data-action-tooltip="管理标签"
               aria-label="管理标签"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
+              <Tag className="h-4 w-4" aria-hidden="true" />
             </button>
 
             {/* 归档按钮 */}
@@ -915,14 +896,7 @@ function SenseCard({
               data-action-tooltip="添加/编辑笔记"
               aria-label="添加/编辑笔记"
             >
-              <svg 
-                className="w-4 h-4" 
-                fill="none"
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
+              <Pencil className="h-4 w-4" aria-hidden="true" />
             </button>
             {/* 例句按钮 */}
             {examples.length > 0 && (
@@ -934,14 +908,10 @@ function SenseCard({
                 data-action-tooltip="查看例句"
                 aria-label="查看例句"
               >
-                <svg 
-                  className={`w-4 h-4 transition-transform duration-200 ${showExamples ? 'rotate-90' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <ChevronRight
+                  className={`h-4 w-4 transition-transform duration-200 ${showExamples ? 'rotate-90' : ''}`}
+                  aria-hidden="true"
+                />
               </button>
             )}
 

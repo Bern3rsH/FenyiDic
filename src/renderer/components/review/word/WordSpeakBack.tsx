@@ -1,5 +1,6 @@
 
-import { useEffect, useState } from 'react'
+ import { useEffect, useState } from 'react'
+ import { Play } from 'lucide-react'
 
 import ReviewHeader from '../common/ReviewHeader'
 
@@ -87,9 +88,7 @@ export default function WordSpeakBack({ headword, phon_uk, phon_us, userAudioUrl
            disabled={isPlaying}
            className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center hover:bg-indigo-200 transition-colors disabled:opacity-50"
          >
-             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-            </svg>
+             <Play className="h-8 w-8 fill-current" aria-hidden="true" />
          </button>
          <div className="mt-2 text-gray-500 text-sm">重播对比 (您 vs 标准)</div>
        </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Check } from 'lucide-react'
 import ReviewFlipCard from './components/ReviewFlipCard'
 import ReviewWordFlipCard from './components/ReviewWordFlipCard'
 import ReadReviewPreparationList from './components/review/common/ReadReviewPreparationList'
@@ -668,9 +669,7 @@ export default function ReviewApp() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="h-7 w-7" aria-hidden="true" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900">已完成本次复习</h2>
             <p className="mt-2 text-sm text-gray-500">

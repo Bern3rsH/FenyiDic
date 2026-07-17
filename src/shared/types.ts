@@ -303,6 +303,8 @@ export type AppUpdateCheckResult =
       error: string
     }
 
+export const APP_FEEDBACK_EMAIL = 'bern3rsh+fenyidic@gmail.com'
+
 // IPC 通道
 export const IPC_CHANNELS = {
   // 搜索
@@ -365,6 +367,9 @@ export const IPC_CHANNELS = {
   CHECK_APP_UPDATE: 'appUpdate:check',
   OPEN_LATEST_RELEASE_PAGE: 'appUpdate:openLatestReleasePage',
   APP_UPDATE_OPEN_CHECK_DIALOG: 'appUpdate:openCheckDialog',
+
+  // 问题反馈
+  OPEN_FEEDBACK_EMAIL: 'feedback:openEmail',
 
   // 匿名统计
   CAPTURE_TELEMETRY_EVENT: 'telemetry:captureEvent',

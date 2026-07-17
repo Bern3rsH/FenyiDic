@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Check, Pencil, Tag, Trash2, X } from 'lucide-react'
 import { useConfirmDialog } from './ConfirmDialog'
 import { useBodyScrollLock } from '../utils/scrollLock'
 import { SYSTEM_TAGS } from '../../shared/types'
@@ -118,9 +119,7 @@ export default function TagManagerDialog({ onClose, onTagsChange }: TagManagerDi
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h3 className="text-lg font-medium text-gray-800">标签管理</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -149,18 +148,16 @@ export default function TagManagerDialog({ onClose, onTagsChange }: TagManagerDi
                          onClick={e => e.stopPropagation()}
                        />
                        <button onClick={() => saveEditing(tag.id)} className="text-blue-500 hover:text-blue-700">
-                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                         <Check className="h-4 w-4" aria-hidden="true" />
                        </button>
                        <button onClick={cancelEditing} className="text-gray-400 hover:text-gray-600">
-                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                         <X className="h-4 w-4" aria-hidden="true" />
                        </button>
                      </div>
                   ) : (
                     <>
                       <div className="flex items-center gap-2 flex-1">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
+                        <Tag className="h-4 w-4 text-gray-400" aria-hidden="true" />
                         <span className="text-sm text-gray-700">{tag.name}</span>
                       </div>
 
@@ -170,9 +167,7 @@ export default function TagManagerDialog({ onClose, onTagsChange }: TagManagerDi
                           className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
                           title="重命名"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
                         </button>
 
                         <button
@@ -180,9 +175,7 @@ export default function TagManagerDialog({ onClose, onTagsChange }: TagManagerDi
                           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                           title="删除标签"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>
                       </div>
                     </>

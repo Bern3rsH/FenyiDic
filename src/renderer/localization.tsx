@@ -435,6 +435,10 @@ const semanticMessages = {
   'zh-CN': {
     settingsLanguageTitle: '界面语言',
     settingsLanguageSubtitle: '切换应用界面文案语言',
+    settingsFeedbackTitle: '问题反馈',
+    settingsFeedbackSubtitle: '点击邮箱，通过系统默认邮件客户端反馈问题或建议',
+    settingsFeedbackEmailAction: '发送反馈邮件',
+    settingsFeedbackEmailError: '无法打开邮件客户端，请手动复制邮箱地址',
     languageChinese: '简体中文',
     languageEnglish: 'English',
     languageRestartTitle: '重启应用以切换语言',
@@ -451,6 +455,10 @@ const semanticMessages = {
   'en-US': {
     settingsLanguageTitle: 'Interface Language',
     settingsLanguageSubtitle: 'Switch the app UI language',
+    settingsFeedbackTitle: 'Feedback',
+    settingsFeedbackSubtitle: 'Email bug reports or suggestions using your default mail app',
+    settingsFeedbackEmailAction: 'Send feedback email',
+    settingsFeedbackEmailError: 'Unable to open the mail app. Please copy the email address manually.',
     languageChinese: 'Simplified Chinese',
     languageEnglish: 'English',
     languageRestartTitle: 'Relaunch to Change Language',

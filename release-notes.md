@@ -177,3 +177,17 @@
 ### English
 
 - Bug Fix: Fixed the issue where assigning multiple tags to the same definition could lead to incorrect review modes
+
+## v1.2.9
+
+### 中文
+
+- 功能：提供解压即用的 ZIP 包和便携版 EXE
+- 功能：在设置中添加反馈入口，支持用户提交邮件反馈
+- 优化：引入图标库，解决应用内图标风格不统一的问题
+
+### English
+
+- Feature: Provided a ready-to-use ZIP package and a portable EXE version
+- Feature: Added a feedback entry in settings, allowing users to submit email feedback
+- Improvement: Introduced an icon library to resolve inconsistencies in icon styles within the app

@@ -95,6 +95,9 @@ export type IpcApi = {
   openLatestReleasePage: () => Promise<{ success: boolean; error?: string }>
   onOpenAppUpdateCheckDialog: (callback: () => void) => () => void
 
+  // 问题反馈
+  openFeedbackEmail: () => Promise<{ success: boolean; error?: string }>
+
   // 匿名统计
   captureTelemetryEvent: (
     eventName: TelemetryEventName,
@@ -199,6 +202,9 @@ const api: IpcApi = {
     ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_UPDATE_OPEN_CHECK_DIALOG, listener)
   },
+
+  // 问题反馈
+  openFeedbackEmail: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_FEEDBACK_EMAIL),
 
   // 匿名统计
   captureTelemetryEvent: (eventName, properties) =>

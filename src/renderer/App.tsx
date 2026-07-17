@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import SearchBar from './components/SearchBar'
 import WordEntry from './components/WordEntry'
 import FavoriteList from './components/FavoriteList'
@@ -695,9 +696,7 @@ function App() {
                 }`}
                 title="后退"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
               <button
                 onClick={goForward}
@@ -709,9 +708,7 @@ function App() {
                 }`}
                 title="前进"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 

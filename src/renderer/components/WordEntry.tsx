@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ChevronRight, CircleAlert, Heart, Pencil, Tag } from 'lucide-react'
 import SenseCard from './SenseCard'
 import TagSelector from './TagSelector'
 import ManualEntryDialog from './ManualEntryDialog'
@@ -738,9 +739,7 @@ function WordEntry({
       {errorMsg && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in pointer-events-none">
           <div className="bg-gray-800/90 backdrop-blur text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3">
-            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <CircleAlert className="h-5 w-5 text-red-400" aria-hidden="true" />
             <span className="font-medium">{errorMsg}</span>
           </div>
         </div>
@@ -767,9 +766,7 @@ function WordEntry({
                     key={tag.id}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
+                    <Tag className="h-3 w-3" aria-hidden="true" />
                     {tag.name}
                   </span>
                 ))}
@@ -783,19 +780,7 @@ function WordEntry({
                     data-action-tooltip={isWordFavorited ? '取消收藏' : '收藏'}
                     aria-label={isWordFavorited ? '取消收藏' : '收藏'}
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
+                    <Heart className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
 
@@ -808,14 +793,7 @@ function WordEntry({
                     data-action-tooltip="管理标签"
                     aria-label="管理标签"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
+                    <Tag className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
 
@@ -841,19 +819,7 @@ function WordEntry({
                     data-action-tooltip="添加/编辑笔记"
                     aria-label="添加/编辑笔记"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
 
@@ -926,14 +892,7 @@ function WordEntry({
                   data-action-tooltip="编辑笔记"
                   aria-label="编辑笔记"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -956,14 +915,10 @@ function WordEntry({
                 >
                   <span className="w-1.5 h-6 bg-teal-500 rounded-full"></span>
                   {group.posTitle}
-                  <svg 
-                    className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${collapsedGroups.has(group.posTitle) ? 'rotate-0' : 'rotate-90'}`} 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight
+                    className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${collapsedGroups.has(group.posTitle) ? 'rotate-0' : 'rotate-90'}`}
+                    aria-hidden="true"
+                  />
                   <span className="text-sm font-normal text-gray-400 ml-auto bg-gray-100 px-2 py-0.5 rounded-full">
                     {group.senses.length}
                   </span>

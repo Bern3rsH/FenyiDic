@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { SYSTEM_TAGS } from '../../shared/types'
+import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { APP_FEEDBACK_EMAIL, SYSTEM_TAGS } from '../../shared/types'
 import type { ReviewMode, TagModeConfig } from '../../shared/types'
 import { SUPPORTED_APP_LOCALES, useLocalization, type AppLocale } from '../localization'
 import { useConfirmDialog } from './ConfirmDialog'
@@ -89,6 +90,7 @@ function Settings({
   const [activeSection, setActiveSection] = useState<SettingSection>('search')
   const [availableTagNames, setAvailableTagNames] = useState<string[]>([])
   const [openReviewConfigDropdownKey, setOpenReviewConfigDropdownKey] = useState<string | null>(null)
+  const [feedbackEmailStatus, setFeedbackEmailStatus] = useState<'idle' | 'opening' | 'error'>('idle')
   const reviewConfigDropdownRegionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -233,6 +235,28 @@ function Settings({
     }
 
     await setLocale(nextLocale)
+  }
+
+  const handleOpenFeedbackEmail = async () => {
+    if (feedbackEmailStatus === 'opening') {
+      return
+    }
+
+    setFeedbackEmailStatus('opening')
+
+    try {
+      const result = await window.api.openFeedbackEmail()
+      if (!result.success) {
+        console.error('Failed to open feedback email', result.error)
+        setFeedbackEmailStatus('error')
+        return
+      }
+
+      setFeedbackEmailStatus('idle')
+    } catch (error) {
+      console.error('Failed to open feedback email', error)
+      setFeedbackEmailStatus('error')
+    }
   }
 
   return (
@@ -388,16 +412,12 @@ function Settings({
                               >
                                 {tagModeConfig.tagName || '请选择标签'}
                               </span>
-                              <svg
+                              <ChevronDown
                                 className={`mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-transform ${
                                   openReviewConfigDropdownKey === tagDropdownKey ? 'rotate-180' : ''
                                 }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
+                                aria-hidden="true"
+                              />
                             </button>
 
                             {openReviewConfigDropdownKey === tagDropdownKey && (
@@ -437,16 +457,12 @@ function Settings({
                               <span className={tagModeConfig.mode ? 'text-gray-700' : 'text-gray-400'}>
                                 {getTagModeLabel(tagModeConfig.mode)}
                               </span>
-                              <svg
+                              <ChevronDown
                                 className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
                                   openReviewConfigDropdownKey === modeDropdownKey ? 'rotate-180' : ''
                                 }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
+                                aria-hidden="true"
+                              />
                             </button>
 
                             {openReviewConfigDropdownKey === modeDropdownKey && (
@@ -478,14 +494,7 @@ function Settings({
                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
                             title="删除此配置"
                           >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </div>
                       )
@@ -503,9 +512,7 @@ function Settings({
                       }`}
                       title={canAddReviewTagModeConfig ? '添加配置' : '请先创建至少一个标签'}
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
-                      </svg>
+                      <Plus className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -703,6 +710,35 @@ function Settings({
                       }`}
                     >
                       {updateButtonText}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900">{t('settingsFeedbackTitle')}</div>
+                      <div className="mt-1 text-sm text-gray-500">{t('settingsFeedbackSubtitle')}</div>
+                      {feedbackEmailStatus === 'error' && (
+                        <div className="mt-2 text-sm text-red-600" role="alert">
+                          {t('settingsFeedbackEmailError')}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleOpenFeedbackEmail()}
+                      disabled={feedbackEmailStatus === 'opening'}
+                      aria-label={t('settingsFeedbackEmailAction')}
+                      title={t('settingsFeedbackEmailAction')}
+                      className={`max-w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium shadow-sm transition-colors ${
+                        feedbackEmailStatus === 'opening'
+                          ? 'cursor-wait text-gray-400'
+                          : 'text-blue-600 hover:border-blue-200 hover:bg-blue-50'
+                      }`}
+                    >
+                      <span className="break-all">{APP_FEEDBACK_EMAIL}</span>
                     </button>
                   </div>
                 </div>

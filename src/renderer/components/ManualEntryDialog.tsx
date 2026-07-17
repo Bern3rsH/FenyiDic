@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { CreateCustomEntryExample } from '../../shared/types'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -270,9 +271,7 @@ export default function ManualEntryDialog({
             <p className="mt-1 text-sm text-gray-500">{dialogDescription}</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -385,9 +384,7 @@ export default function ManualEntryDialog({
                         : 'border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100'
                     }`}
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
-                    </svg>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
