@@ -1,6 +1,6 @@
 {
   "name": "fenyidic",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A dictionary app with sense-level bookmarking and tagging",
   "private": true,
   "license": "UNLICENSED",
@@ -128,7 +128,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
-    "electron": "^31.0.0",
+    "electron": "36.9.5",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.2.0",
     "postcss": "^8.4.38",

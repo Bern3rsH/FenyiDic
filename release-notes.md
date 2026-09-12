@@ -201,3 +201,13 @@
 ### English
 
 - Feature: Thanks to @D-Jiang's contribution, added support for dark mode
+
+## v1.3.1
+
+### 中文
+
+- 优化：优化数据上报
+
+### English
+
+- Improvement: Optimized data reporting

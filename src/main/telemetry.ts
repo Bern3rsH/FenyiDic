@@ -71,6 +71,7 @@ function getTelemetryEnvironment(): string {
 
 function getCommonTelemetryProperties(): TelemetryEventProperties {
   return {
+    app_name: 'FenyiDic',
     app_version: app.getVersion(),
     app_environment: getTelemetryEnvironment(),
     platform: process.platform,
@@ -185,8 +186,11 @@ export function captureTelemetryEvent(
   properties: TelemetryEventProperties = {}
 ): void {
   const sanitizedProperties = {
+    ...sanitizeTelemetryProperties(properties),
     ...getCommonTelemetryProperties(),
-    ...sanitizeTelemetryProperties(properties)
+    distinct_id: `fenyidic:${getAnonymousInstallId()}`,
+    $process_person_profile: false,
+    $geoip_disable: true
   }
 
   if (sentryEnabled) {
@@ -205,7 +209,7 @@ export function captureTelemetryEvent(
   const abortController = new AbortController()
   const timeoutId = setTimeout(() => abortController.abort(), TELEMETRY_REQUEST_TIMEOUT_MS)
 
-  fetch(`${posthogHost}/capture/`, {
+  Promise.resolve().then(() => fetch(`${posthogHost}/i/v0/e/`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
@@ -213,11 +217,21 @@ export function captureTelemetryEvent(
     body: JSON.stringify({
       api_key: posthogKey,
       event: eventName,
-      distinct_id: getAnonymousInstallId(),
+      distinct_id: `fenyidic:${getAnonymousInstallId()}`,
       properties: sanitizedProperties
     }),
     signal: abortController.signal
-  })
+  }))
+    .then(async (response) => {
+      if (!response.ok) {
+        logPostHogFailure(`[Telemetry] PostHog capture returned HTTP ${response.status}.`)
+        return
+      }
+      const result = await response.json() as { status?: number | string }
+      if (result.status !== 1 && result.status !== 'Ok') {
+        logPostHogFailure('[Telemetry] PostHog rejected the event.')
+      }
+    })
     .catch((error) => {
       if (error instanceof Error && error.name === 'AbortError') {
         logPostHogFailure('[Telemetry] PostHog capture timed out.')
